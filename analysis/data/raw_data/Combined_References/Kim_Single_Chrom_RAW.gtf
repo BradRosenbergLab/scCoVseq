@@ -1,0 +1,161 @@
+##ORF1ab
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "ORF1ab"; transcript_id "ORF1ab";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	68	1000.000000	+	.	gene_id "ORF1ab"; transcript_id "ORF1ab"; exon_number "1"; exon_id "ORF1ab.1";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	15812	15814	1000.000000	+	.	gene_id "ORF1ab"; transcript_id "ORF1ab"; exon_number "2";  exon_id "ORF1ab.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	15812	15892	1000.000000	+	0	gene_id "ORF1ab"; transcript_id "ORF1ab"; exon_number "2";  exon_id "ORF1ab.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	15893	15895	1000.000000	+	.	gene_id "ORF1ab"; transcript_id "ORF1ab"; exon_number "2";  exon_id "ORF1ab.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	15777	29903	1000.000000	+	.	gene_id "ORF1ab"; transcript_id "ORF1ab"; exon_number "2";  exon_id "ORF1ab.2";
+###S.1
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "S"; transcript_id "S.1";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	63	1000.000000	+	.	gene_id "S"; transcript_id "S.1"; exon_number "1"; exon_id "S.1.1";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	21563	21565	1000.000000	+	.	gene_id "S"; transcript_id "S.1"; exon_number "2"; exon_id "S.1.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	21563	25378	1000.000000	+	0	gene_id "S"; transcript_id "S.1"; exon_number "2"; exon_id "S.1.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	25379	25381	1000.000000	+	.	gene_id "S"; transcript_id "S.1"; exon_number "2"; exon_id "S.1.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	21550	29903	1000.000000	+	.	gene_id "S"; transcript_id "S.1"; exon_number "2"; exon_id "S.1.2";
+####S.2
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "S"; transcript_id "S.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	65	1000.000000	+	.	gene_id "S"; transcript_id "S.2"; exon_number "1"; exon_id "S.2.1";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	21563	21565	1000.000000	+	.	gene_id "S"; transcript_id "S.2"; exon_number "2"; exon_id "S.2.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	21563	25378	1000.000000	+	0	gene_id "S"; transcript_id "S.2"; exon_number "2"; exon_id "S.2.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	25379	25381	1000.000000	+	.	gene_id "S"; transcript_id "S.2"; exon_number "2"; exon_id "S.2.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	21552	29903	1000.000000	+	.	gene_id "S"; transcript_id "S.2"; exon_number "2"; exon_id "S.2.2";
+##ORF3a
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "ORF3a"; transcript_id "ORF3a";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	65	1000.000000	+	.	gene_id "ORF3a"; transcript_id "ORF3a"; exon_number "1"; exon_id "ORF3a.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	25393	25395	1000.000000	+	.	gene_id "ORF3a"; transcript_id "ORF3a"; exon_number "2"; exon_id "ORF3a.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	25393	26214	1000.000000	+	0	gene_id "ORF3a"; transcript_id "ORF3a"; exon_number "2"; exon_id "ORF3a.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	26215	26217	1000.000000	+	.	gene_id "ORF3a"; transcript_id "ORF3a"; exon_number "2"; exon_id "ORF3a.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	25381	29903	1000.000000	+	.	gene_id "ORF3a"; transcript_id "ORF3a"; exon_number "2"; exon_id "ORF3a.2"
+##E
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "E"; transcript_id "E";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	69	1000.000000	+	.	gene_id "E"; transcript_id "E"; exon_number "1"; exon_id "E.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	26245	26247	1000.000000	+	.	gene_id "E"; transcript_id "E"; exon_number "2"; exon_id "E.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	26245	26466	1000.000000	+	0	gene_id "E"; transcript_id "E"; exon_number "2"; exon_id "E.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	26467	26469	1000.000000	+	.	gene_id "E"; transcript_id "E";  exon_number "2"; exon_id "E.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	26237	29903	1000.000000	+	.	gene_id "E"; transcript_id "E"; exon_number "2"; exon_id "E.2"
+##M
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "M"; transcript_id "M";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	64	1000.000000	+	.	gene_id "M"; transcript_id "M"; exon_number "1"; exon_id "M.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	26523	26525	1000.000000	+	.	gene_id "M"; transcript_id "M"; exon_number "2"; exon_id "M.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	26523	27185	1000.000000	+	0	gene_id "M"; transcript_id "M"; exon_number "2"; exon_id "M.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	27186	27188	1000.000000	+	.	gene_id "M"; transcript_id "M"; exon_number "2"; exon_id "M.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	26468	29903	1000.000000	+	.	gene_id "M"; transcript_id "M"; exon_number "2"; exon_id "M.2"
+##ORF6
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "ORF6"; transcript_id "ORF6";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	69	1000.000000	+	.	gene_id "ORF6"; transcript_id "ORF6"; exon_number "1"; exon_id "ORF6.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	27202	27204	1000.000000	+	.	gene_id "ORF6"; transcript_id "ORF6"; exon_number "2"; exon_id "ORF6.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	27202	27381	1000.000000	+	0	gene_id "ORF6"; transcript_id "ORF6"; exon_number "2"; exon_id "ORF6.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	27382	27384	1000.000000	+	.	gene_id "ORF6"; transcript_id "ORF6"; exon_number "2"; exon_id "ORF6.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	27041	29903	1000.000000	+	.	gene_id "ORF6"; transcript_id "ORF6"; exon_number "2"; exon_id "ORF6.2"
+###ORF7b.1
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.1";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	66	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.1"; exon_number "1"; exon_id "ORF7b.1.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	27756	27758	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.1"; exon_number "2"; exon_id "ORF7b.1.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	27756	27881	1000.000000	+	0	gene_id "ORF7b"; transcript_id "ORF7b.1"; exon_number "2"; exon_id "ORF7b.1.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	27882	27884	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.1"; exon_number "2"; exon_id "ORF7b.1.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	27485	29903	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.1"; exon_number "2"; exon_id "ORF7b.1.1"
+####ORF7b.2
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	69	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.2"; exon_number "1"; exon_id "ORF7b.2.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	27756	27758	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.2"; exon_number "2"; exon_id "ORF7b.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	27756	27881	1000.000000	+	0	gene_id "ORF7b"; transcript_id "ORF7b.2"; exon_number "2"; exon_id "ORF7b.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	27882	27884	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.2"; exon_number "2"; exon_id "ORF7b.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	27674	29903	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.2"; exon_number "2"; exon_id "ORF7b.2.2"
+###ORF7b.3
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.3";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	71	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.3"; exon_number "1"; exon_id "ORF7b.3.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	27825	27827	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.3"; exon_number "2"; exon_id "ORF7b.3.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	27825	27881	1000.000000	+	0	gene_id "ORF7b"; transcript_id "ORF7b.3"; exon_number "2"; exon_id "ORF7b.3.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	27882	27884	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.3"; exon_number "2"; exon_id "ORF7b.3.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	27762	29903	1000.000000	+	.	gene_id "ORF7b"; transcript_id "ORF7b.3"; exon_number "2"; exon_id "ORF7b.3.2"
+###ORF7a.1
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.1";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	65	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.1"; exon_number "1"; exon_id "ORF7a.1.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	27394	27396	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.1"; exon_number "2"; exon_id "ORF7a.1.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	27394	27753	1000.000000	+	0	gene_id "ORF7a"; transcript_id "ORF7a.1"; exon_number "2"; exon_id "ORF7a.1.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	27754	27756	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.1"; exon_number "2"; exon_id "ORF7a.1.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	27384	29903	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.1"; exon_number "2"; exon_id "ORF7a.1.2"
+###ORF7a.2
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	60	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.2"; exon_number "1"; exon_id "ORF7a.2.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	27394	27396	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.2"; exon_number "2"; exon_id "ORF7a.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	27394	27753	1000.000000	+	0	gene_id "ORF7a"; transcript_id "ORF7a.2"; exon_number "2"; exon_id "ORF7a.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	27754	27756	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.2"; exon_number "2"; exon_id "ORF7a.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	27379	29903	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.2"; exon_number "2"; exon_id "ORF7a.2.2"
+###ORF7a.3
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.3";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	66	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.3"; exon_number "1"; exon_id "ORF7a.3.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	27394	27396	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.3"; exon_number "2"; exon_id "ORF7a.3.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	27394	27753	1000.000000	+	0	gene_id "ORF7a"; transcript_id "ORF7a.3"; exon_number "2"; exon_id "ORF7a.3.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	27754	27756	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.3"; exon_number "2"; exon_id "ORF7a.3.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	27385	29903	1000.000000	+	.	gene_id "ORF7a"; transcript_id "ORF7a.3"; exon_number "2"; exon_id "ORF7a.3.2"
+###ORF8.1
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "ORF8"; transcript_id "ORF8.1";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	63	1000.000000	+	.	gene_id "ORF8"; transcript_id "ORF8.1"; exon_number "1"; exon_id "ORF8.1.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	27894	27896	1000.000000	+	.	gene_id "ORF8"; transcript_id "ORF8.1"; exon_number "2"; exon_id "ORF8.1.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	27894	28253	1000.000000	+	0	gene_id "ORF8"; transcript_id "ORF8.1"; exon_number "2"; exon_id "ORF8.1.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	28254	28256	1000.000000	+	.	gene_id "ORF8"; transcript_id "ORF8.1"; exon_number "2"; exon_id "ORF8.1.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	27882	29903	1000.000000	+	.	gene_id "ORF8"; transcript_id "ORF8.1"; exon_number "2"; exon_id "ORF8.1.2"
+###ORF8.2
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "ORF8"; transcript_id "ORF8.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	65	1000.000000	+	.	gene_id "ORF8"; transcript_id "ORF8.2"; exon_number "1"; exon_id "ORF8.2.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	27894	27896	1000.000000	+	.	gene_id "ORF8"; transcript_id "ORF8.2"; exon_number "2"; exon_id "ORF8.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	27894	28253	1000.000000	+	0	gene_id "ORF8"; transcript_id "ORF8.2"; exon_number "2"; exon_id "ORF8.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	28254	28256	1000.000000	+	.	gene_id "ORF8"; transcript_id "ORF8.2"; exon_number "2"; exon_id "ORF8.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	27884	29903	1000.000000	+	.	gene_id "ORF8"; transcript_id "ORF8.2"; exon_number "2"; exon_id "ORF8.2.2"
+###N.1
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.1";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	68	1000.000000	+	.	gene_id "N"; transcript_id "N.1"; exon_number "1"; exon_id "N.1.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	29222	29224	1000.000000	+	.	gene_id "N"; transcript_id "N.1"; exon_number "2"; exon_id "N.1.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	29222	29527	1000.000000	+	0	gene_id "N"; transcript_id "N.1"; exon_number "2"; exon_id "N.1.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	29528	29530	1000.000000	+	.	gene_id "N"; transcript_id "N.1"; exon_number "2"; exon_id "N.1.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	29154	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.1"; exon_number "2"; exon_id "N.1.2"
+##N.2
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.2";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	61	1000.000000	+	.	gene_id "N"; transcript_id "N.2"; exon_number "1"; exon_id "N.2.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	28274	28276	1000.000000	+	.	gene_id "N"; transcript_id "N.2"; exon_number "2"; exon_id "N.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	28274	29527	1000.000000	+	0	gene_id "N"; transcript_id "N.2"; exon_number "2"; exon_id "N.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	29528	29530	1000.000000	+	.	gene_id "N"; transcript_id "N.2"; exon_number "2"; exon_id "N.2.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	28252	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.2"; exon_number "2"; exon_id "N.2.2"
+###N.3
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.3";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	61	1000.000000	+	.	gene_id "N"; transcript_id "N.3"; exon_number "1"; exon_id "N.3.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	28274	28276	1000.000000	+	.	gene_id "N"; transcript_id "N.3"; exon_number "2"; exon_id "N.3.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	28274	29527	1000.000000	+	0	gene_id "N"; transcript_id "N.3"; exon_number "2"; exon_id "N.3.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	29528	29530	1000.000000	+	.	gene_id "N"; transcript_id "N.3"; exon_number "2"; exon_id "N.3.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	28251	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.3"; exon_number "2"; exon_id "N.3.2"
+##N.4
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.4";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	76	1000.000000	+	.	gene_id "N"; transcript_id "N.4"; exon_number "1"; exon_id "N.4.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	28274	28276	1000.000000	+	.	gene_id "N"; transcript_id "N.4"; exon_number "2"; exon_id "N.4.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	28274	29527	1000.000000	+	0	gene_id "N"; transcript_id "N.4"; exon_number "2"; exon_id "N.4.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	29528	29530	1000.000000	+	.	gene_id "N"; transcript_id "N.4"; exon_number "2"; exon_id "N.4.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	28267	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.4"; exon_number "2"; exon_id "N.4.2"
+##N.5
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.5";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	63	1000.000000	+	.	gene_id "N"; transcript_id "N.5"; exon_number "1"; exon_id "N.5.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	28274	28276	1000.000000	+	.	gene_id "N"; transcript_id "N.5"; exon_number "2"; exon_id "N.5.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	28274	29527	1000.000000	+	0	gene_id "N"; transcript_id "N.5"; exon_number "2"; exon_id "N.5.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	29528	29530	1000.000000	+	.	gene_id "N"; transcript_id "N.5"; exon_number "2"; exon_id "N.5.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	28254	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.5"; exon_number "2"; exon_id "N.5.2"
+###N.6
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.6";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	68	1000.000000	+	.	gene_id "N"; transcript_id "N.6"; exon_number "1"; exon_id "N.6.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	28274	28276	1000.000000	+	.	gene_id "N"; transcript_id "N.6"; exon_number "2"; exon_id "N.6.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	28274	29527	1000.000000	+	0	gene_id "N"; transcript_id "N.6"; exon_number "2"; exon_id "N.6.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	29528	29530	1000.000000	+	.	gene_id "N"; transcript_id "N.6"; exon_number "2"; exon_id "N.6.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	28263	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.6"; exon_number "2"; exon_id "N.6.2"
+##N.7
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.7";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	64	1000.000000	+	.	gene_id "N"; transcript_id "N.7"; exon_number "1"; exon_id "N.7.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	28274	28276	1000.000000	+	.	gene_id "N"; transcript_id "N.7"; exon_number "2"; exon_id "N.7.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	CDS	28274	29527	1000.000000	+	0	gene_id "N"; transcript_id "N.7"; exon_number "2"; exon_id "N.7.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	29528	29530	1000.000000	+	.	gene_id "N"; transcript_id "N.7"; exon_number "2"; exon_id "N.7.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	28255	29903	1000.000000	+	.	gene_id "N"; transcript_id "N.7"; exon_number "2"; exon_id "N.7.2"
+###Unknown
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	transcript	1	29903	1000.000000	+	.	gene_id "unknown"; transcript_id "unknown";
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	70	70	1000.000000	+	.	gene_id "unknown"; transcript_id "unknown"; exon_number "1"; exon_id "unknown.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	start_codon	27761	27762	1000.000000	+	.	gene_id "unknown"; transcript_id "unknown"; exon_number "2"; exon_id "unknown.2"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	stop_codon	68	70	1000.000000	+	.	gene_id "unknown"; transcript_id "unknown"; exon_number "1"; exon_id "unknown.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	1	70	1000.000000	+	.	gene_id "unknown"; transcript_id "unknown"; exon_number "1"; exon_id "unknown.1"
+MN985325.1	wuhCor1_Kim_TRS_sgmRNAs	exon	27761	29903	1000.000000	+	.	gene_id "unknown"; transcript_id "unknown"; exon_number "2"; exon_id "unknown.2"

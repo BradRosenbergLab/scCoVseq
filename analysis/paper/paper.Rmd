@@ -1,0 +1,3652 @@
+---
+title: "Unambiguous detection of SARS-CoV-2 subgenomic mRNAs with single cell RNA sequencing"
+author:
+  - Phillip Cohen:
+      email: phillip.cohen@icahn.mssm.edu
+      institute: [MSSM_Micro]
+      correspondence: false
+  - Emma DeGrace:
+      email: emma.degrace@icahn.mssm.edu
+      institute: [MSSM_Micro]
+      correspondence: false
+  - Oded Danziger:
+      email: oded.danziger@mssm.edu
+      institute: [MSSM_Micro]
+      correspondence: false
+  - Roosheel Patel:
+      email: roosheel.patel@icahn.mssm.edu
+      institute: [MSSM_Micro]
+      correspondence: false
+  - Erika Barrall:
+      email: erika.barrall@mssm.edu
+      institute: [MSSM_Micro]
+      correspondence: false
+  - Tesia Bobrowski:
+      email: tesia.bobrowski@mssm.edu
+      institute: [MSSM_Micro]
+      correspondence: false
+  - Thomas Kehrer
+      institute: [MSSM_Micro]
+      correspondence: false
+  - Anastasija Cupic
+      institute: [MSSM_Micro]
+      correspondence: false
+  - Lisa Miorin
+      institute: [MSSM_Micro]
+      correspondence: false
+  - Adolfo García-Sastre
+      institute: [MSSM_Micro]
+      correspondence: false
+  - Brad Rosenberg:
+      email: brad.rosenberg@mssm.edu
+      institute: [MSSM_Micro]
+      correspondence: true
+institute:
+  - MSSM_Micro: Icahn School of Medicine at Mount Sinai, Department of Microbiology, New York, NY 10029
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    bookdown::html_document2:
+      toc: true
+      toc_float: true
+      fig_caption: yes
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  comment = "#>",
+  fig.path = "../figures/",
+  dpi = 300
+)
+```
+
+# Introduction
+
+This Rmarkdown file contains code to generate figure panels appearing in our manuscript:
+
+> Phillip Cohen, Emma J DeGrace, Oded Danziger, Roosheel S Patel, Erika A Barrall, Tesia Bobrowski, Thomas Kehrer, Anastasija Cupic, Lisa Miorin, Adolfo García-Sastre, Brad R Rosenberg (2023). *"Unambiguous detection of SARS-CoV-2 subgenomic mRNAs with single cell RNA sequencing"*. *In revision*
+
+
+##Prepare R environment
+
+###Load Packages and Custom Functions
+```{r echo = FALSE, message=FALSE}
+library(renv)
+library(pheatmap)
+library(mgsub)
+library(rrtools)
+library(here)
+library(styler)
+library(hdf5r)
+library(tidyverse)
+library(BiocManager)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(grid)
+library(gridExtra)
+library(ggrepel)
+library(ggbio)
+library(ggpubr)
+library(paletteer)
+library(patchwork)
+library(Seurat)
+library(edgeR)
+library(ComplexHeatmap)
+source(here("R/functions.R"))
+```
+
+### Paths to Input Files
+
+```{r}
+#### Path to all h5 files output from CellRanger containg Gene x Cell Matrices
+h5_Files <- list.files(
+  path = here("analysis/data/raw_data/CellRanger_Gene_x_Cell_Matrices_h5"),
+  pattern = ".h5$", full.names = TRUE)
+
+names(h5_Files) <- list.files(
+  path = here("analysis/data/raw_data/CellRanger_Gene_x_Cell_Matrices_h5"), 
+  pattern = ".h5$", full.names = FALSE) %>%
+  gsub(pattern = ".h5$", replacement = "")
+
+#### Exclude data aligned to NCBI reference
+h5_Files <- h5_Files[grep(pattern = "NCBI_Single_Chrom.h5",
+                          x = h5_Files, invert = TRUE)]
+
+#### Path to Gene x Cell Matrices RDS files from scCoVseq quant pipeline
+scCoVseq_RDS_Files <- list.files(
+  path = here("analysis/data/raw_data/scCoVseq_Gene_x_Cell_Matrices"),
+  pattern = ".rds$", full.names = TRUE) %>% 
+  as.list()
+
+names(scCoVseq_RDS_Files) <- list.files(
+  path = here("analysis/data/raw_data/scCoVseq_Gene_x_Cell_Matrices"),
+  pattern = ".rds$", full.names = FALSE) %>%
+  gsub(pattern = "^3P", replacement = "ThreeP") %>%
+  gsub(pattern = "_Gene_Cell_Matrix.rds$", replacement = "")
+
+#### Path to csv file data for GRanges objects for annotation of alignment data
+GRanges_Files <- list.files(
+  path = here("analysis/data/raw_data/GRanges_Tables"),
+  pattern = ".csv$", full.names = TRUE) %>% as.list()
+
+names(GRanges_Files) <- list.files(
+  path = here("analysis/data/raw_data/GRanges_Tables"),
+  pattern = ".csv$", full.names = FALSE) %>%
+  gsub(pattern = ".csv$", replacement = "")
+
+#### Path to Cell Barcode Whitelists
+Whitelists <- list.files(
+  path = here("analysis/data/derived_data"),
+  pattern = ".txt$", full.names = TRUE)
+names(Whitelists) <- list.files(
+  path = here("analysis/data/derived_data"),
+  pattern = ".txt$", full.names = FALSE) %>%
+  gsub(pattern = ".txt$", replacement = "")
+```
+
+### Paths to Output Files
+```{r}
+#### Path to Vectorized Figure Outputs
+vectorizedFiguresPath <- here("analysis/figures/Vectorized/")
+
+#### Path to Rasterized Figure Outputs
+rasterizedFiguresPath <- here("analysis/figures/Rasterized/")
+
+#### Path to Data Objects Generated in this Analysis
+derivedDataPath <- here("analysis/data/derived_data/")
+```
+
+### Prepare Color Palettes
+```{r}
+#### Color Palette for Ambiguous/Unambiguous Regions of Transcriptome Reference
+ambiguous_palette <- palettes_d$wesanderson$BottleRocket2[1:2]
+names(ambiguous_palette) <- c("Unambiguous", "Ambiguous")
+scales::show_col(ambiguous_palette)
+
+#### Color Palette to Identify Sequencing Methods
+sequencing_palette <- c(palettes_d$trekcolors$lcars_2369[c(1, 5)], "#4DA59E")
+names(sequencing_palette) <- c("10X 3'", "10X 5'", "10X 5'\nExtended R1")
+scales::show_col(sequencing_palette)
+
+#### Color Palette for Viral ORFs
+Gene_Palette <- palettes_d$ggsci$category20_d3[1:12]
+names(Gene_Palette) <- viral_genes
+scales::show_col(Gene_Palette)
+
+### Color Palette for Infection Sample
+Infection_Sample_Palette <- palettes_d$ggsci$uniform_startrek[4:5]
+names(Infection_Sample_Palette) <- c("SARS-CoV-2", "Mock")
+scales::show_col(Infection_Sample_Palette)
+
+### Color Palette for Infection Classification
+Infection_Classification_Palette <- c(palettes_d$ggsci$uniform_startrek[4],
+                                      palettes_d$ggsci$nrc_npg[2:1],
+                                      palettes_d$ggsci$nrc_npg[2])
+names(Infection_Classification_Palette) <- c("Mock", "Bystander", "Infected",
+                                             "Uninfected")
+scales::show_col(Infection_Classification_Palette)
+
+### Color Palette for Assays
+Assay_Palette <- palettes_d$wesanderson$FantasticFox1[c(1:3, 5)]
+scales::show_col(Assay_Palette)
+
+### Color Palette for Empty Droplet Infection Classification
+Empty_Infection_Classification_Palette <- palettes_d$ggsci$nrc_npg[c(3:1, 2, 5:6)]
+names(Empty_Infection_Classification_Palette) <- 
+  c("Mock", "Bystander", "Infected", "Uninfected",
+    "Empty_Mock", "Empty_SARS-CoV-2")
+scales::show_col(Empty_Infection_Classification_Palette)
+```
+
+### Environment Objects
+
+This object will contain the minimal objects needed for downstream analysis
+```{r}
+objects_to_save <- ls()
+```
+
+# Figure 1A SARS-CoV-2 Transcription Schematic
+
+Here we will prepare a scaled schematic of the SARS-CoV-2 Genome and the generation of sgmRNAs.
+
+```{r}
+### Import CSV with SARS-CoV-2 ORF Ranges and Annotations
+karyotype_GRange <- read.csv(
+  file = paste0(
+    here("analysis/data/raw_data/GRanges_Tables"), "/Genome_Schematic.csv")
+  )
+
+### Convert Dataframe to GRange Object
+karyotype_GRange <- GRanges(karyotype_GRange)
+
+### Set Seqlength for GRanges to SARS-CoV-2 Genome Size
+seqlengths(karyotype_GRange) <- rep.int(29882, times = 12)
+
+### Set Order Seqlevels by Postion of ORF in SARS-CoV-2 Genome
+seqlevels(karyotype_GRange) <- c(
+  "SARS-CoV-2", "ORF1a", "ORF1ab", "S", "ORF3a", "E", "M", "ORF6", "ORF7a",
+  "ORF7b", "ORF8", "N")
+
+### Set Levels of gene_id by Postion of ORF in SARS-CoV-2 Genome
+karyotype_GRange$gene_id <- factor(karyotype_GRange$gene_id,
+                                   levels = c("ORF1a", "ORF1ab", "S", "ORF3a",
+                                              "E", "M", "ORF6", "ORF7a",
+                                              "ORF7b", "ORF8", "N")
+                                   )
+### Subset Ranges Corresponding to CDS, UTR, or TRS
+CDS_Ranges <- karyotype_GRange[karyotype_GRange$type == "cds"]
+UTR_Ranges <- karyotype_GRange[karyotype_GRange$type == "utr"]
+TRS_Ranges <- karyotype_GRange[karyotype_GRange$type == "TRS-L"]
+
+### Plot Genome Schematic with ggbio "Karyogram" layout
+plot <- autoplot(TRS_Ranges, 
+                 layout = "karyogram", 
+                 fill = "black", color = "black", ylim = c(10 / 3, 10 / 3 * 2)) +
+  layout_karyogram(UTR_Ranges, geom = "rect", ylim = c(10 / 3, 10 / 3 * 2),
+                   aes(fill = gene_id), color = "black") +
+  layout_karyogram(CDS_Ranges, geom = "rect",
+                   aes(fill = gene_id), color = "black")
+
+### Make Plot Background Transparent
+plot@ggplot$layers[[1]]$aes_params$colour <- "transparent"
+plot@ggplot$layers[[1]]$aes_params$fill <- "transparent"
+
+### Move Gene Labels to Left Side
+plot@ggplot$facet$params$switch <- "y"
+
+### Change Gene Color Fill, Adjust Aesthetics
+plot <- plot +
+  scale_fill_manual(values = Gene_Palette, name = "ORF") +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.line.y = element_blank(),
+    strip.text.y.left = element_text(angle = 0, color = "black"),
+    strip.background.y = element_rect(fill = "gray75", color = "transparent"),
+    panel.background = element_rect(fill = "gray90")
+  )
+
+
+### Print Genome Schematic
+plot
+
+### Save Genome Schematic
+ggplot2::ggsave(
+  filename = paste0(vectorizedFiguresPath, "Figure_1/A_Genome_Schematic.pdf"),
+  plot = plot@ggplot,
+  device = "pdf", dpi = 1200, width = 7.5, units = "in"
+  )
+
+### Delete plot object
+rm(plot)
+```
+
+### Prepare a genome legend for future plots
+
+```{r}
+genome_legend <- ggplot(
+  as.data.frame(subset(karyotype_GRange, seqnames == "SARS-CoV-2")),
+  aes(
+    xmin = start,
+    xmax = end,
+    ymin = -1,
+    ymax = 1,
+    fill = gene_id
+  )
+) +
+  geom_rect() +
+  scale_fill_manual(values = Gene_Palette, name = "ORF") +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.line.y = element_blank(),
+    strip.text.y.left = element_text(angle = 0, color = "black"),
+    strip.background.y = element_rect(fill = "transparent", color = "transparent"),
+    panel.background = element_rect(fill = "transparent")
+  )
+```
+
+# Figure 3: Compare SARS-CoV-2 Reads by 10X Method
+
+```{r}
+### Import data
+Viral_Gene_Multimapping <- readRDS(
+  file = paste0(vectorizedFiguresPath, "/Figure_2/Viral_Gene_Multimapping.rds"))
+
+### Reformat sequencing method name for 10X 5' Extended R1
+Viral_Gene_Multimapping$Sequencing_Method <- str_replace(
+  string = Viral_Gene_Multimapping$Sequencing_Method,
+  pattern = "10X 5' Extended R1",
+  replacement = "10X 5'\nExtended R1")
+
+### Plot
+Gene_Mapping_Plot <- ggplot(
+  subset(Viral_Gene_Multimapping, Read_Type != "Ambiguous"),
+  aes(
+    x = Sequencing_Method,
+    y = Reads_per_million,
+    fill = Sequencing_Method
+  )
+) +
+  geom_col(position = "stack") +
+  scale_y_continuous(labels = scales::comma,
+                     expand = expansion(0, 1.05)) +
+  scale_fill_manual(values = sequencing_palette) +
+  labs(
+    x = element_blank(),
+    y = "Viral Reads,\nper Million",
+    fill = "Mapping"
+  ) +
+  facet_wrap(facets = vars(Read_Type),
+             nrow = 1,
+             scales = "free", drop = TRUE) +
+  publication_theme +
+  theme(
+    plot.title.position = "plot",
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.background = element_rect(fill = "transparent",
+                                    color = "transparent"))
+
+Gene_Mapping_Plot
+ggplot2::ggsave(
+  filename = paste0(vectorizedFiguresPath,
+                    "Figure_2/G_Ambiguous_Mapping_by_Seq_Method.pdf"),
+  device = "pdf",
+  plot = Gene_Mapping_Plot,
+  height = 3, width = 5, units = "in"
+)
+```
+
+# Figure 3: Compare SARS-CoV-2 sgmRNA Quantification by 10X Method
+
+## Load 10X Gene Expression Counts from Infected Samples
+
+```{r}
+### Import Cell Barcode Whitelists
+### Whitelists generated with `Preparing_CellBC_Whitelists.Rmd`
+Whitelists <- lapply(Whitelists, function(x) {
+  x <- read.delim(x, header = FALSE)
+  x <- x$V1
+  return(x)
+})
+
+### Select Gene Expression h5 files from the Vero Experiment
+Raw_Data <- lapply(h5_Files, Read10X_h5)
+
+### Filter out Cells not in Pre-determined Whitelist
+Raw_Data[grep(pattern = "^ThreeP_Inf", x = names(Raw_Data))] <- lapply(
+  X = Raw_Data[grep(pattern = "^ThreeP_Inf", x = names(Raw_Data))],
+  subset_to_barcodes_whitelist, whitelist = Whitelists$ThreeP_Inf_Cells)
+
+Raw_Data[grep(pattern = "^ThreeP_Mock", x = names(Raw_Data))] <- lapply(
+  X = Raw_Data[grep(pattern = "^ThreeP_Mock", x = names(Raw_Data))],
+  subset_to_barcodes_whitelist, whitelist = Whitelists$ThreeP_Mock_Cells)
+
+Raw_Data[grep(pattern = "^FiveP_Inf", x = names(Raw_Data))] <- lapply(
+  X = Raw_Data[grep(pattern = "^FiveP_Inf", x = names(Raw_Data))],
+  subset_to_barcodes_whitelist, whitelist = Whitelists$FiveP_Inf_Cells)
+
+Raw_Data[grep(pattern = "^FiveP_Mock", x = names(Raw_Data))] <- lapply(
+  X = Raw_Data[grep(pattern = "^FiveP_Mock", x = names(Raw_Data))],
+  subset_to_barcodes_whitelist, whitelist = Whitelists$FiveP_Mock_Cells)
+
+Raw_Data[grep(pattern = "^Ext_R1_Inf", x = names(Raw_Data))] <- lapply(
+  X = Raw_Data[grep(pattern = "^Ext_R1_Inf", x = names(Raw_Data))],
+  subset_to_barcodes_whitelist, whitelist = Whitelists$Ext_R1_Inf_Cells)
+
+Raw_Data[grep(pattern = "^Ext_R1_Mock", x = names(Raw_Data))] <- lapply(
+  X = Raw_Data[grep(pattern = "^Ext_R1_Mock", x = names(Raw_Data))],
+  subset_to_barcodes_whitelist, whitelist = Whitelists$Ext_R1_Mock_Cells)
+
+### Create Seurat Object
+All_Seurat <- lapply(Raw_Data, CreateSeuratObject)
+
+### Delete raw data object
+rm(Raw_Data)
+```
+
+## Import scCoVseq Gene x Cell Matrices
+
+```{r}
+Raw_scCoVseq_Data <- lapply(scCoVseq_RDS_Files, readRDS)
+
+### Filter out Cells not in Pre-determined Whitelist
+Raw_scCoVseq_Data[grep(pattern = "^ThreeP_Inf", x = names(Raw_scCoVseq_Data))] <- 
+  lapply(
+    X = Raw_scCoVseq_Data[grep(pattern = "^ThreeP_Inf", x = names(Raw_scCoVseq_Data))],
+    subset_scCoVseq_to_barcodes_whitelist,
+    whitelist = Whitelists$ThreeP_Inf_Cells)
+
+Raw_scCoVseq_Data[grep(pattern = "^ThreeP_Mock", x = names(Raw_scCoVseq_Data))] <- 
+  lapply(
+    X = Raw_scCoVseq_Data[grep(pattern = "^ThreeP_Mock", x = names(Raw_scCoVseq_Data))],
+    subset_scCoVseq_to_barcodes_whitelist, 
+    whitelist = Whitelists$ThreeP_Mock_Cells)
+
+Raw_scCoVseq_Data[grep(pattern = "^FiveP_Inf", x = names(Raw_scCoVseq_Data))] <- 
+  lapply(
+    X = Raw_scCoVseq_Data[grep(pattern = "^FiveP_Inf", x = names(Raw_scCoVseq_Data))],
+    subset_scCoVseq_to_barcodes_whitelist,
+    whitelist = Whitelists$FiveP_Inf_Cells)
+
+Raw_scCoVseq_Data[grep(pattern = "^FiveP_Mock", x = names(Raw_scCoVseq_Data))] <-
+  lapply(X = Raw_scCoVseq_Data[grep(pattern = "^FiveP_Mock", x = names(Raw_scCoVseq_Data))],
+         subset_scCoVseq_to_barcodes_whitelist,
+         whitelist = Whitelists$FiveP_Mock_Cells)
+
+Raw_scCoVseq_Data[grep(pattern = "^Ext_R1_Inf", x = names(Raw_scCoVseq_Data))] <- 
+  lapply(
+    X = Raw_scCoVseq_Data[grep(pattern = "^Ext_R1_Inf", x = names(Raw_scCoVseq_Data))],
+    subset_scCoVseq_to_barcodes_whitelist,
+    whitelist = Whitelists$Ext_R1_Inf_Cells)
+
+Raw_scCoVseq_Data[grep(pattern = "^Ext_R1_Mock", x = names(Raw_scCoVseq_Data))] <- 
+  lapply(
+    X = Raw_scCoVseq_Data[grep(pattern = "^Ext_R1_Mock", x = names(Raw_scCoVseq_Data))],
+    subset_scCoVseq_to_barcodes_whitelist,
+    whitelist = Whitelists$Ext_R1_Mock_Cells)
+
+### Create Seurat Objects for scCoVseq files
+scCoVseq_Seurat <- lapply(Raw_scCoVseq_Data, CreateSeuratObject)
+
+### Add scCoVseq Suffix to Seurat Object Names
+names(scCoVseq_Seurat) <- paste0(names(scCoVseq_Seurat), "_scCoVseq")
+
+### Remove UMIs ambiguously assigned to genes
+scCoVseq_Seurat <- lapply(scCoVseq_Seurat, Remove_Ambiguous_UMIs)
+
+### Delete raw data
+rm(Raw_scCoVseq_Data)
+```
+
+## Join scCoVseq and All Seurat Objects into one list
+
+```{r}
+### Specify Type of Quantification in Metadata
+scCoVseq_Seurat <- lapply(scCoVseq_Seurat, function(x) {
+  x <- AddMetaData(x,
+    metadata = rep.int("scCoVseq", times = nrow(x@meta.data)),
+    col.name = "Quantification_Strategy"
+  )
+  return(x)
+})
+
+All_Seurat <- lapply(All_Seurat, function(x) {
+  x <- AddMetaData(x,
+    metadata = rep.int("CellRanger", times = nrow(x@meta.data)),
+    col.name = "Quantification_Strategy"
+  )
+  return(x)
+})
+
+### Combine lists of Seurat Objects
+All_Seurat <- c(All_Seurat, scCoVseq_Seurat)
+
+### Add Metadata for total viral UMIs detected, total host UMIs detected,
+### percent of gene expression derived from virus, and cell barcode
+All_Seurat <- lapply(All_Seurat, calculate_viral_nUMIs, genes = viral_genes)
+All_Seurat <- lapply(All_Seurat, calculate_host_nUMIs)
+All_Seurat <- lapply(All_Seurat, add_cell_barcodes)
+All_Seurat <- lapply(All_Seurat, PercentageFeatureSet,
+                     pattern = viral_genes, col.name = "percent_viral")
+
+### Calculate Percentage Mitochondrial Gene Expression
+All_Seurat <- lapply(All_Seurat, PercentageFeatureSet,
+                     pattern = "^MT-", col.name = "percent_mito")
+
+### Add Metadata for Sample, Sequencing, and Reference Used
+for (i in seq_along(All_Seurat)) {
+  object_name <- strsplit(names(All_Seurat)[i], split = "_")
+  sequencing_name <- object_name[[1]][1]
+  sequencing_name <- str_replace(
+    string = sequencing_name, pattern = "ThreeP",
+    replacement = "10X 3'"
+    )
+  sequencing_name <- str_replace(
+    string = sequencing_name, pattern = "Ext",
+    replacement = "10X 5'\nExtended R1"
+    )
+  sequencing_name <- str_replace(
+    string = sequencing_name, pattern = "FiveP",
+    replacement = "10X 5'"
+    )
+  sample_name <- object_name[[1]][2]
+  sample_name <- ifelse(sample_name == "R1", object_name[[1]][[3]], sample_name)
+  sample_name <- ifelse(sample_name == "Inf", "SARS-CoV-2", "Mock")
+  reference <- paste(
+    object_name[[1]][3:length(object_name[[1]])], collapse = " "
+    )
+  All_Seurat[[i]] <- AddMetaData(
+    object = All_Seurat[[i]],
+    metadata = rep.int(sequencing_name, times = nrow(All_Seurat[[i]]@meta.data)),
+    col.name = "Sequencing_Strategy"
+  )
+  All_Seurat[[i]] <- AddMetaData(
+    object = All_Seurat[[i]],
+    metadata = rep.int(sample_name, times = nrow(All_Seurat[[i]]@meta.data)),
+    col.name = "Infection_Sample"
+  )
+  All_Seurat[[i]] <- AddMetaData(
+    object = All_Seurat[[i]],
+    metadata = rep.int(reference, times = nrow(All_Seurat[[i]]@meta.data)),
+    col.name = "Transcriptome_Reference"
+  )
+}
+```
+
+## Merge Mock and Infected Seurat Objects
+
+```{r}
+Combined_Seurat <- list(
+  Ext_R1_Kim_scCoVseq = merge(
+    x = All_Seurat$Ext_R1_Inf_Kim_Single_Chrom_scCoVseq,
+    y = All_Seurat$Ext_R1_Mock_Kim_Single_Chrom_scCoVseq,
+    add.cell.ids = c("Inf", "Mock")
+  ),
+  ThreeP_Kim_scCoVseq = merge(
+    x = All_Seurat$ThreeP_Inf_Kim_Single_Chrom_scCoVseq,
+    y = All_Seurat$ThreeP_Mock_Kim_Single_Chrom_scCoVseq,
+    add.cell.ids = c("Inf", "Mock")
+  ),
+  FiveP_Kim_scCoVseq = merge(
+    x = All_Seurat$FiveP_Inf_Kim_Single_Chrom_scCoVseq,
+    y = All_Seurat$FiveP_Mock_Kim_Single_Chrom_scCoVseq,
+    add.cell.ids = c("Inf", "Mock")
+  ),
+  Ext_R1_Kim_CellRanger = merge(
+    x = All_Seurat$Ext_R1_Inf_Kim_Single_Chrom,
+    y = All_Seurat$Ext_R1_Mock_Kim_Single_Chrom,
+    add.cell.ids = c("Inf", "Mock")
+  ),
+  ThreeP_Kim_CellRanger = merge(
+    x = All_Seurat$ThreeP_Inf_Kim_Single_Chrom,
+    y = All_Seurat$ThreeP_Mock_Kim_Single_Chrom,
+    add.cell.ids = c("Inf", "Mock")
+  ),
+  FiveP_Kim_CellRanger = merge(
+    x = All_Seurat$FiveP_Inf_Kim_Single_Chrom,
+    y = All_Seurat$FiveP_Mock_Kim_Single_Chrom,
+    add.cell.ids = c("Inf", "Mock")
+  )
+)
+```
+
+## Scale and Normalize Data
+
+```{r}
+### Log Normalize Combined Data
+Combined_Seurat <- lapply(Combined_Seurat, NormalizeData,
+  normalization.method = "LogNormalize",
+  verbose = FALSE
+)
+
+### Scale Combined Data
+Combined_Seurat <- lapply(Combined_Seurat, ScaleData, verbose = FALSE)
+```
+
+## Classify Infection Status with K Medoids Method
+
+```{r}
+set.seed(12345)
+Combined_Seurat <- lapply(Combined_Seurat, classify_infection_status_k_medoid,
+                          k = 2, genes = viral_sgmRNA
+                          )
+```
+
+## Visualize Infection Classification of K Medoid Clustering
+
+```{r}
+lapply(seq_along(Combined_Seurat), function(x) {
+  Seurat_Obj <- Combined_Seurat[[x]]
+  Title <- names(Combined_Seurat)[x]
+  VlnPlot(Seurat_Obj,
+    features = "nCount_Viral",
+    pt.size = 0, group.by = "Infection_Classification_K_Medoid_2"
+  ) + NoLegend() +
+    labs(x = element_blank(), y = "Total Viral UMIs per Cell", title = Title) +
+    theme(
+      axis.text.x = element_text(hjust = 0.5, vjust = 0, angle = 0),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_rect(fill = "transparent", colour = NA),
+      plot.background = element_rect(fill = "transparent", colour = NA)
+    )
+})
+```
+
+# Figure 3: Plot Viral Gene Quantification by 10X Method
+
+Prepare Data
+```{r}
+### Subset scCoVseq objects to Infected cells
+Viral_Gene_Expression <- lapply(
+  Combined_Seurat[grep(names(Combined_Seurat), pattern = "scCoVseq")], subset,
+  Infection_Classification_K_Medoid_2 == "Infected" &
+    Infection_Sample == "SARS-CoV-2"
+)
+
+
+### Determine the minimum 25th Quantile of Total UMIs per cell (aka threshold)
+threshold <- sapply(Viral_Gene_Expression, function(x) {
+  threshold <- quantile(x$nCount_RNA, prob = 0.25)
+  ### Round value to nearest UMI
+  threshold <- round(threshold)
+  return(threshold)
+}) %>% min()
+
+### Remove Cells with less UMIs than the threshold
+Viral_Gene_Expression <- lapply(
+  Viral_Gene_Expression, subset,
+  nCount_RNA >= threshold
+)
+
+### Downsample Total UMIs/Cells to threshold value
+Viral_Gene_Expression <- lapply(
+  Viral_Gene_Expression,
+  function(x) {
+    x@assays$RNA@counts <- SampleUMI(
+      data = x@assays$RNA@counts,
+      max.umi = threshold,
+      upsample = FALSE, verbose = FALSE
+    )
+    return(x)
+  }
+)
+
+### Downsample each object to the same number of infected cells from each method
+min_number_of_infected_cells <- sapply(Viral_Gene_Expression, ncol) %>% min()
+Viral_Gene_Expression <- lapply(Viral_Gene_Expression, function(x) {
+  cells_to_keep <- WhichCells(x,
+    downsample = min_number_of_infected_cells
+  )
+  x <- subset(x,
+    cells = cells_to_keep
+  )
+  return(x)
+})
+
+### Pull raw viral gene counts from all Seurat objects
+Viral_Gene_Expression <- lapply(Viral_Gene_Expression, FetchData,
+  vars = c(
+    as.character(viral_genes),
+    "Infection_Classification_K_Medoid_2", "Infection_Sample",
+    "Sequencing_Strategy",
+    "Quantification_Strategy",
+    "Transcriptome_Reference"
+  ),
+  slot = "counts"
+)
+
+### Combine Data Frames
+Viral_Gene_Expression <- bind_rows(Viral_Gene_Expression)
+
+### Add Cell Barcode to Dataframe
+Viral_Gene_Expression$Cell_BC <- rownames(Viral_Gene_Expression)
+
+### Combine all viral gene expression measurments into one column
+Viral_Gene_Expression <- pivot_longer(Viral_Gene_Expression,
+  cols = as.character(viral_genes),
+  names_to = "Gene", values_to = "Counts"
+)
+
+### Set levels for viral genes
+Viral_Gene_Expression$Gene <- factor(Viral_Gene_Expression$Gene,
+  levels = viral_genes
+)
+```
+
+# Figure 2H:Plot UMI Quantification of scCoVseq Reads per 10X Method
+```{r}
+ggplot(
+  subset(
+    Viral_Gene_Expression, Gene != "gRNA"
+  ),
+  aes(
+    x = Gene, y = Counts,
+    fill = Sequencing_Strategy,
+    color = Sequencing_Strategy
+  )
+) +
+  geom_violin(
+    position = position_dodge(width = 0.5),
+    color = "black",
+    draw_quantiles = TRUE,
+    trim = TRUE,
+    scale = "width",
+    width = 0.6
+  ) +
+  geom_boxplot(
+    width = 0.3,
+    position = position_dodge(width = 0.5),
+    color = "black",
+    outlier.shape = NA,
+    show.legend = FALSE
+  ) +
+  scale_color_manual(values = sequencing_palette) +
+  scale_y_continuous(
+    trans = "log2",
+    breaks = 2^(seq(0, 10, by = 2))
+  ) +
+  scale_fill_manual(values = sequencing_palette) +
+  theme_classic() +
+  labs(
+    x = element_blank(),
+    y = "UMIs per Cell",
+    title = "sgmRNA Quantification, by scCoVseq",
+    fill = "10X Method"
+  ) +
+  #publication_theme +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = c(0.1, 0.9)
+  )
+ggplot2::ggsave(
+  filename = paste0(vectorizedFiguresPath, "Figure_2/H_scCoVseq_sgmRNA_Gene_Expression_by_Seq_Method_BoxPlot.pdf"),
+  units = "cm", width = 30, height = 12
+)
+```
+
+# Plot correlation among viral gene expression measured per 10X method
+
+```{r}
+### Subset scCoVseq objects to Infected cells
+Viral_Gene_Expression <- lapply(
+  Combined_Seurat[grep(names(Combined_Seurat), pattern = "scCoVseq")], subset,
+  Infection_Sample == "SARS-CoV-2"
+)
+
+### Fetch normalized expression values of each viral gene,
+### infection classification, and sequencing strategy metadata
+Viral_Gene_Expression_Mat <- lapply(Viral_Gene_Expression, FetchData,
+                                   vars = as.character(viral_genes),
+                                   slot = "data")
+
+### Calculate pearson correlation between viral gene expression per cell
+Viral_Gene_Expression_Mat <- lapply(Viral_Gene_Expression_Mat, function(x){
+  x <- x[, as.character(viral_genes)] %>% cor(.,method = "pearson")
+  return(x)
+})
+
+### Prepare a color function for the correlation values
+Color_Fun <- circlize::colorRamp2(
+    breaks = seq(0, 1, 0.0001),
+    colors = viridis::viridis(10001))
+
+### Calculate average expression of each viral gene in each dataset
+Viral_Gene_Counts <- lapply(Viral_Gene_Expression, AverageExpression,
+                            features = as.character(viral_genes),
+                            slot = "data",
+                            return.seurat = FALSE)
+
+### Convert output to vector
+Viral_Gene_Counts <- lapply(Viral_Gene_Counts, function(x){
+  output <- x$RNA[,1]
+  return(output)
+})
+
+### Prepare a color function for the number of counts
+Counts_Color_Fun <- circlize::colorRamp2(
+    breaks = c(0,6),
+    colors = c("white", "firebrick4"))
+
+### Prepare a heatmap of the 10X 5' Extended R1 correlation values
+extR1 <- Heatmap(Viral_Gene_Expression_Mat$Ext_R1_Kim_scCoVseq,
+                 col = Color_Fun,
+                 name = "Pearson's\nR",
+                 left_annotation = rowAnnotation(
+                   Average_Expression = Viral_Gene_Counts$Ext_R1_Kim_scCoVseq,
+                   col = list(Average_Expression = Counts_Color_Fun),
+                   show_annotation_name = TRUE,
+                   annotation_name_rot = 35,
+                   annotation_name_gp = gpar(fontsize = 18),
+                   annotation_legend_param = list(title_gp = gpar(fontsize = 18),
+                                                  labels_gp = gpar(fontsize = 18),
+                                                  legend_height = unit(64, "mm"))),
+         cluster_columns = FALSE,
+         column_names_rot = 45,
+         row_title = "10X 5'\nExtended R1",
+         row_title_gp = gpar(fontsize = 24),
+         row_title_rot = 0,
+         row_names_gp = gpar(fontsize = 18),
+         cluster_rows = FALSE,
+         column_names_gp = gpar(fontsize = 18),
+         row_names_side = "left",
+         height = unit(3, "in"),
+         width = unit(3, "in"),
+         heatmap_legend_param = list(title_gp = gpar(fontsize = 18),
+                                     labels_gp = gpar(fontsize = 18),
+                                     legend_height = unit(64, "mm")),
+         rect_gp = gpar(type = "none"),
+         cell_fun = function(j, i, x, y, w, h, fill) {
+           if(i >= j) {
+             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+             }
+           }
+         )
+
+### Prepare a heatmap of the 10X 3' correlation values
+threeP <- Heatmap(Viral_Gene_Expression_Mat$ThreeP_Kim_scCoVseq,
+                  col = Color_Fun,
+                  name = "Pearson's\nR",
+                  left_annotation = rowAnnotation(
+                    Average_Expression = Viral_Gene_Counts$ThreeP_Kim_scCoVseq,
+                    col = list(Average_Expression = Counts_Color_Fun),
+                   show_annotation_name = FALSE,
+                   annotation_legend_param = list(title_gp = gpar(fontsize = 18),
+                                                  labels_gp = gpar(fontsize = 18),
+                                                  legend_height = unit(64, "mm"))),
+         cluster_columns = FALSE,
+         column_names_rot = 45,
+         cluster_rows = FALSE,
+         row_title = "10X 3'",
+         row_title_gp = gpar(fontsize = 24),
+         row_title_rot = 0,
+         row_names_gp = gpar(fontsize = 18),
+         column_names_gp = gpar(fontsize = 18),
+         row_names_side = "left",
+         height = unit(3, "in"),
+         width = unit(3, "in"),
+         heatmap_legend_param = list(title_gp = gpar(fontsize = 18),
+                                     labels_gp = gpar(fontsize = 18),
+                                     legend_height = unit(64, "mm")),
+         rect_gp = gpar(type = "none"),
+         cell_fun = function(j, i, x, y, w, h, fill) {
+           if(i >= j) {
+             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+             }
+           }
+         )
+
+### Prepare a heatmap of the 10X 5' correlation values
+fiveP <- Heatmap(Viral_Gene_Expression_Mat$FiveP_Kim_scCoVseq,
+                  col = Color_Fun,
+                  name = "Pearson's\nR",
+                                  left_annotation = rowAnnotation(
+                   Average_Expression = Viral_Gene_Counts$FiveP_Kim_scCoVseq,
+                   col = list(Average_Expression = Counts_Color_Fun),
+                   show_annotation_name = FALSE,
+                   annotation_legend_param = list(title_gp = gpar(fontsize = 18),
+                                                  labels_gp = gpar(fontsize = 18),
+                                                  legend_height = unit(64, "mm"))),
+         cluster_columns = FALSE,
+         column_names_rot = 45,
+         column_names_gp = gpar(fontsize = 18),
+         row_title = "10X 5'",
+         row_title_gp = gpar(fontsize = 24),
+         row_title_rot = 0,
+         cluster_rows = FALSE,
+         row_names_gp = gpar(fontsize = 18),
+         row_names_side = "left",
+         height = unit(3, "in"),
+         width = unit(3, "in"),
+         heatmap_legend_param = list(title_gp = gpar(fontsize = 18),
+                                     labels_gp = gpar(fontsize = 18),
+                                     legend_height = unit(64, "mm")),
+         rect_gp = gpar(type = "none"),
+         cell_fun = function(j, i, x, y, w, h, fill) {
+           if(i >= j) {
+             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+             }
+           }
+         )
+
+### Plot three heatmaps together and save as a pdf
+pdf(file = here("analysis/figures/Vectorized/Figure_4/E_Viral_gene_cor_per_method.pdf"),
+    width = 8,
+    height = 24)
+threeP %v% fiveP %v% extR1
+dev.off()
+```
+
+# Plot viral gene expression across a range of total viral UMIs
+
+```{r}
+### Fetch counts of each viral gene, total viral UMIs/cell and 
+### total host UMIs/cell for infected cells only
+Viral_Gene_Expression <- FetchData(
+  Combined_Seurat$Ext_R1_Kim_scCoVseq,
+  vars = c(as.character(viral_genes),
+           "nCount_Viral",
+           "host_nUMI"),
+  slot = "counts",
+  cells = WhichCells(
+    Combined_Seurat$Ext_R1_Kim_scCoVseq,
+    expression = Infection_Classification_K_Medoid_2 == "Infected"))
+
+### Make cell barcode column
+Viral_Gene_Expression$Cell_Barcode <- rownames(Viral_Gene_Expression)
+
+### Pivot data so all viral genes are combined into one column then 
+### order cells by their total viral UMIs
+Viral_Gene_Expression <- Viral_Gene_Expression %>% 
+  pivot_longer(cols = as.character(viral_genes),
+               names_to = "Gene",
+               values_to = "Counts") %>%
+  arrange(nCount_Viral)
+
+### Make cell barcode column a factor ordered by total viral UMIs per cell  
+Viral_Gene_Expression$Cell_Barcode <- ordered(
+  Viral_Gene_Expression$Cell_Barcode,
+  levels = unique(Viral_Gene_Expression$Cell_Barcode))
+
+### Make viral gene a factor ordered by order in viral genome
+Viral_Gene_Expression$Gene <- factor(Viral_Gene_Expression$Gene,
+                                     levels = viral_genes)
+
+### Plot viral UMIs per gene per cell as a stacked bar plot
+Viral_GEX_Plots_Stacked <- ggplot(Viral_Gene_Expression,
+       aes(x = Cell_Barcode,
+           y = Counts,
+           fill = Gene,
+           color = Gene)) +
+  geom_col(position = "stack") +
+  scale_color_manual(values = Gene_Palette) +
+  scale_fill_manual(values = Gene_Palette) +
+  labs(x = element_blank(),
+       y = "Viral UMIs per Cell") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05)),
+                     labels = scales::comma) +
+  scale_x_discrete(expand = expansion(mult = c(0.01, 0.01))) +
+  publication_theme +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        strip.background = element_blank()) 
+
+### Plot viral UMIs per gene per cell as a stacked bar plot
+### scaled to 100% of total viral UMIs
+Viral_GEX_Plots_Fill <- ggplot(Viral_Gene_Expression,
+       aes(x = Cell_Barcode,
+           y = Counts,
+           fill = Gene,
+           color = Gene)) +
+  geom_col(position = "fill") +
+  scale_color_manual(values = Gene_Palette) +
+  scale_fill_manual(values = Gene_Palette) +
+  labs(x = element_blank(),
+       y = "Fraction of Viral UMIs\nper Total Viral UMIs") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05)),
+                     labels = scales::percent) +
+  scale_x_discrete(expand = expansion(mult = c(0.01, 0.01))) +
+  publication_theme +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        strip.background = element_blank()) 
+
+### Plot total host UMIs per cell as a bar plot
+Host_UMIs_plot <- ggplot(Viral_Gene_Expression,
+       aes(x = factor(Cell_Barcode),
+           y = host_nUMI)) +
+  geom_col(color = "grey75",
+           fill = "grey75") +
+  labs(x = "Cell",
+       y = "Total Host UMIs") +
+  scale_y_continuous(expand = expansion(mult = c(0.01, 0.05)),
+                     labels = scales::comma) +
+  scale_x_discrete(expand = expansion(mult = c(0.01, 0.01))) +
+  publication_theme +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_blank()) 
+
+### Arrange plots &
+(Viral_GEX_Plots_Stacked / Viral_GEX_Plots_Fill / Host_UMIs_plot) +
+  plot_layout(heights = c(2, 2, 1),
+              guides = "collect")
+ggsave(filename =
+         here("analysis/figures/Vectorized/Figure_4/D_Distribution_of_Viral_UMIs_Vero.pdf"),
+       width = 5, height = 6.5)
+```
+
+# Visualize Classification with tSNE
+
+```{r}
+#### Calculate Distance Matrix and Run tSNE
+Combined_Seurat <- lapply(Combined_Seurat, function(x) {
+  viral_gene_matrix <- GetAssayData(x, features = as.character(viral_sgmRNA),
+                                    slot = "scale.data")
+  viral_gene_matrix <- viral_gene_matrix[as.character(viral_sgmRNA), ]
+  d <- dist(t(viral_gene_matrix))
+  x <- RunTSNE(x,
+    distance.matrix = d,
+    seed.use = 12345,
+    check_duplicates = FALSE
+  )
+  return(x)
+})
+```
+
+# Figure 3C: Demonstrate infection classification with scCoVseq data
+
+```{r}
+plot_1 <- DimPlot(Combined_Seurat$Ext_R1_Kim_scCoVseq,
+  group.by = "Infection_Sample",
+  cols = Infection_Sample_Palette, shuffle = TRUE, seed = 123,
+  pt.size = 0.1
+) +
+  labs(title = "Experimental\nCondition") +
+  coord_equal() +
+  publication_theme +
+  theme(
+    axis.title = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    legend.position = "bottom"
+  )
+
+plot_2 <- DimPlot(Combined_Seurat$Ext_R1_Kim_scCoVseq,
+  group.by = "Infection_Classification_K_Medoid_2",
+  cols = Infection_Classification_Palette, shuffle = TRUE, seed = 123,
+  pt.size = 0.1
+) +
+  labs(
+    title = "Assigned\nInfection Status",
+    caption = "n = 3047 cells"
+  ) +
+  coord_equal() +
+  publication_theme +
+  theme(
+    axis.title = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    legend.position = "bottom",
+    plot.caption = element_text(size = 6)
+  )
+
+(plot_1 | plot_2)
+ggplot2::ggsave(
+  plot = last_plot(),
+  filename = paste0(vectorizedFiguresPath, 
+                    "Figure_4/B_Infection_Classification_with_tSNE.pdf"),
+  width = 3, units = "in"
+  )
+```
+
+# Figure 3C: Plot Viral Genes on tSNE
+
+```{r}
+### Make feature plots for each viral gene
+Viral_Gene_Plots <- FeaturePlot(
+  object = Combined_Seurat$Ext_R1_Kim_scCoVseq,
+  features = as.character(viral_genes),
+  cols = viridis::viridis_pal()(10),
+  pt.size = 0.1,
+  combine = FALSE
+)
+
+### Format axis labels and make figure square
+Viral_Gene_Plots <- lapply(Viral_Gene_Plots, function(x) {
+  x <- x + coord_equal() +
+    publication_theme +
+    theme(
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      axis.title = element_blank(),
+    )
+  return(x)
+})
+
+### Organize plots with patchwork
+wrap_plots(Viral_Gene_Plots) +
+  plot_layout(
+    guides = "collect",
+    nrow = 2, ncol = 5
+  )
+
+### Save
+ggplot2::ggsave(
+  plot = last_plot(),
+  filename = paste0(vectorizedFiguresPath,
+                    "Figure_4/A_Viral_Gene_Expression_Feature_Plots.pdf"),
+  width = 5, height = 1.75
+)
+
+### Remove legend and save again
+Viral_Gene_Plots <- lapply(Viral_Gene_Plots, function(x) {
+  x <- x + theme(legend.position = "none")
+  return(x)
+})
+
+### Organize plots with patchwork
+wrap_plots(Viral_Gene_Plots) +
+  plot_layout(
+    guides = "collect",
+    nrow = 2, ncol = 5
+  )
+
+### Save
+ggplot2::ggsave(
+  plot = last_plot(),
+  filename = paste0(vectorizedFiguresPath, "Figure_4/A_Viral_Gene_Expression_Feature_Plots_NoLegend.pdf"),
+  width = 5, height = 2.5
+)
+```
+
+# Supplemental Figure 5C: Demonstrate the level of background viral RNA detection in uninfected cells
+
+Compare sgRNA detection in empty droplets to infected cells
+
+## Import scCoVseq Gene x Cell Matrices
+
+```{r}
+Raw_scCoVseq_Data <- lapply(scCoVseq_RDS_Files, readRDS)
+
+### Create Seurat Objects for scCoVseq files
+scCoVseq_Seurat <- lapply(Raw_scCoVseq_Data, CreateSeuratObject)
+
+### Add scCoVseq Suffix to Seurat Object Names
+names(scCoVseq_Seurat) <- paste0(names(scCoVseq_Seurat), "_scCoVseq")
+
+### Remove UMIs ambiguously assigned to genes
+scCoVseq_Seurat <- lapply(scCoVseq_Seurat, Remove_Ambiguous_UMIs)
+
+### Delete raw data
+rm(Raw_scCoVseq_Data)
+```
+
+## Select empty droplets
+
+```{r}
+### Calculate percent mitochondrial gene expression
+scCoVseq_Seurat <- lapply(scCoVseq_Seurat,
+                          PercentageFeatureSet,
+                          pattern = "^MT-",
+                          col.name = "percent_mito")
+
+### Plot UMIs/cell, genes/cell, and percent mitochondrial gene expression
+lapply(names(scCoVseq_Seurat), function(i){
+  FeatureScatter(scCoVseq_Seurat[[i]],
+                 feature1 = "nCount_RNA",
+                 feature2 = "nFeature_RNA") +
+    ggtitle(i) +
+    NoLegend() +
+    geom_hline(yintercept = 100)
+    FeatureScatter(scCoVseq_Seurat[[i]],
+                 feature1 = "nCount_RNA",
+                 feature2 = "percent_mito") +
+    ggtitle(i) +
+    NoLegend() +
+    geom_hline(yintercept = 5)
+})
+
+### Select empty droplets per sample
+empty_droplets <- list(
+  Ext_R1_Inf_Kim_Single_Chrom_scCoVseq = select_empty_droplets(
+    Whitelists$Ext_R1_Inf_Cells,
+    scCoVseq_Seurat$Ext_R1_Inf_Kim_Single_Chrom_scCoVseq),
+  Ext_R1_Mock_Kim_Single_Chrom_scCoVseq = select_empty_droplets(
+    Whitelists$Ext_R1_Mock_Cells,
+    scCoVseq_Seurat$Ext_R1_Mock_Kim_Single_Chrom_scCoVseq),
+
+  FiveP_Inf_Kim_Single_Chrom_scCoVseq = select_empty_droplets(
+    Whitelists$FiveP_Inf_Cells,
+    scCoVseq_Seurat$FiveP_Inf_Kim_Single_Chrom_scCoVseq),
+  FiveP_Mock_Kim_Single_Chrom_scCoVseq = select_empty_droplets(
+    Whitelists$FiveP_Mock_Cells,
+    scCoVseq_Seurat$FiveP_Mock_Kim_Single_Chrom_scCoVseq),
+
+  ThreeP_Inf_Kim_Single_Chrom_scCoVseq = select_empty_droplets(
+    Whitelists$ThreeP_Inf_Cells,
+    scCoVseq_Seurat$ThreeP_Inf_Kim_Single_Chrom_scCoVseq),
+  ThreeP_Mock_Kim_Single_Chrom_scCoVseq = select_empty_droplets(
+    Whitelists$ThreeP_Mock_Cells,
+    scCoVseq_Seurat$ThreeP_Mock_Kim_Single_Chrom_scCoVseq))
+
+## Add infection sample to data
+empty_droplets$Ext_R1_Inf_Kim_Single_Chrom_scCoVseq$Infection_Sample <- "SARS-CoV-2"
+empty_droplets$ThreeP_Inf_Kim_Single_Chrom_scCoVseq$Infection_Sample <- "SARS-CoV-2"
+empty_droplets$FiveP_Inf_Kim_Single_Chrom_scCoVseq$Infection_Sample <- "SARS-CoV-2"
+empty_droplets$Ext_R1_Mock_Kim_Single_Chrom_scCoVseq$Infection_Sample <- "Mock"
+empty_droplets$ThreeP_Mock_Kim_Single_Chrom_scCoVseq$Infection_Sample <- "Mock"
+empty_droplets$FiveP_Mock_Kim_Single_Chrom_scCoVseq$Infection_Sample <- "Mock"
+
+## Merge mock and infected samples
+empty_droplets <- list(
+  Ext_R1_Kim_scCoVseq = merge(
+    x = empty_droplets$Ext_R1_Inf_Kim_Single_Chrom_scCoVseq,
+    y = empty_droplets$Ext_R1_Mock_Kim_Single_Chrom_scCoVseq,
+    add.cell.ids = c("Inf", "Mock")
+  ),
+  ThreeP_Kim_scCoVseq = merge(
+    x = empty_droplets$ThreeP_Inf_Kim_Single_Chrom_scCoVseq,
+    y = empty_droplets$ThreeP_Mock_Kim_Single_Chrom_scCoVseq,
+    add.cell.ids = c("Inf", "Mock")
+  ),
+  FiveP_Kim_scCoVseq = merge(
+    x = empty_droplets$FiveP_Inf_Kim_Single_Chrom_scCoVseq,
+    y = empty_droplets$FiveP_Mock_Kim_Single_Chrom_scCoVseq,
+    add.cell.ids = c("Inf", "Mock")
+  )
+)
+
+## Make infection classification "empty droplet"
+empty_droplets <- lapply(empty_droplets, function(x){
+  x <- AddMetaData(object = x,
+                   metadata = paste0(
+                     "Empty_", x$Infection_Sample
+                     ),
+                   col.name = "Infection_Classification_K_Medoid_2")
+  return(x)
+})
+
+## Merge empty droplets with each sample
+Optimized_Seurat_with_Empty_Droplets <- list(
+  Ext_R1_Kim_scCoVseq = merge(
+    x = empty_droplets$Ext_R1_Kim_scCoVseq,
+    y = Combined_Seurat$Ext_R1_Kim_scCoVseq,
+    add.cell.ids = c("Empty", "Cell_Containing")
+  ),
+  ThreeP_Kim_scCoVseq = merge(
+    x = empty_droplets$ThreeP_Kim_scCoVseq,
+    y = Combined_Seurat$ThreeP_Kim_scCoVseq,
+    add.cell.ids = c("Empty", "Cell_Containing")
+  ),
+  FiveP_Kim_scCoVseq = merge(
+    x = empty_droplets$FiveP_Kim_scCoVseq,
+    y = Combined_Seurat$FiveP_Kim_scCoVseq,
+    add.cell.ids = c("Empty", "Cell_Containing")
+  )
+)
+
+### Re-scale and re-normalize data
+Optimized_Seurat_with_Empty_Droplets <- lapply(
+  Optimized_Seurat_with_Empty_Droplets,
+  NormalizeData,
+  assay = "RNA",
+  normalization.method = "LogNormalize",
+  verbose = FALSE)
+Optimized_Seurat_with_Empty_Droplets <- lapply(
+  Optimized_Seurat_with_Empty_Droplets,
+  ScaleData,
+  assay = "RNA",
+  verbose = FALSE)
+```
+
+# Plot sgRNA per sample by infection state
+
+```{r}
+### Pull raw viral gene counts from all Seurat objects
+Viral_Gene_Expression <- lapply(Optimized_Seurat_with_Empty_Droplets, FetchData,
+  vars = c(
+    as.character(viral_genes),
+    "Infection_Classification_K_Medoid_2",
+    "Infection_Sample",
+    "Sequencing_Strategy"
+  ),
+  slot = "counts"
+)
+
+### Replace empty sequencing strategy cells with sequencing strategy
+Viral_Gene_Expression <- lapply(Viral_Gene_Expression, function(x){
+  x$Sequencing_Strategy[is.na(x$Sequencing_Strategy)] <- 
+    unique(x$Sequencing_Strategy[! is.na(x$Sequencing_Strategy)])
+  return(x)
+})
+
+### Combine Data Frames
+Viral_Gene_Expression <- bind_rows(Viral_Gene_Expression)
+
+### Add Cell Barcode to Dataframe
+Viral_Gene_Expression$Cell_BC <- rownames(Viral_Gene_Expression)
+
+### Calculate total viral UMIs per cell
+Viral_Gene_Expression <- mutate(
+  Viral_Gene_Expression,
+  `Total Viral UMIs` = (gRNA + S + ORF3a + E + M + ORF6 + ORF7a + ORF7b + ORF8 + N))
+
+
+### Combine all viral gene expression measurements into one column
+Viral_Gene_Expression <- pivot_longer(Viral_Gene_Expression,
+  cols = c(as.character(viral_genes), `Total Viral UMIs`),
+  names_to = "Gene", values_to = "Counts"
+)
+
+### Set levels for viral genes
+Viral_Gene_Expression$Gene <- factor(Viral_Gene_Expression$Gene,
+  levels = c(as.character(viral_genes), "Total Viral UMIs")
+)
+
+### Change Uninfected to "Bystander" for infection classification label
+Viral_Gene_Expression$Infection_Classification_K_Medoid_2 <-
+  str_replace(Viral_Gene_Expression$Infection_Classification_K_Medoid_2,
+              pattern = "Uninfected",
+              replacement = "Bystander")
+
+### Set levels for infection classification
+Viral_Gene_Expression$Infection_Classification_K_Medoid_2 <-
+  factor(Viral_Gene_Expression$Infection_Classification_K_Medoid_2,
+         levels = c("Empty_Mock", "Mock",
+                    "Empty_SARS-CoV-2","Bystander", "Infected"))
+
+plot <- ggplot(Viral_Gene_Expression,
+  aes(
+    x = Sequencing_Strategy, y = Counts,
+    fill = Infection_Classification_K_Medoid_2,
+    color = Infection_Classification_K_Medoid_2
+  )
+) +
+  geom_violin(
+    position = "dodge",
+    color = "black",
+    draw_quantiles = TRUE,
+    trim = TRUE,
+    scale = "width",
+    size = 0.1
+  ) +
+  facet_wrap(facets = vars(Gene),
+             scales = "free_y") +
+  scale_y_continuous(trans = scales::trans_new(name = "log10_pseudocount",
+                                       transform = function(x){log10(1 + x)},
+                                       inverse = function(x){(10^x) - 1},
+                                       breaks = function(x){log10(x)},
+                                       domain = c(0, Inf)),
+                     breaks = 10^c(0:4)) +
+  scale_color_manual(values =
+                       Empty_Infection_Classification_Palette[names(
+                         Empty_Infection_Classification_Palette
+                         ) != "Uninfected"]) +
+  scale_fill_manual(values =
+                      Empty_Infection_Classification_Palette[names(
+                        Empty_Infection_Classification_Palette
+                        ) != "Uninfected"]) +
+  labs(
+    x = element_blank(),
+    y = "UMIs per Cell",
+    fill = "Barcode Type") +
+  publication_theme +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+suppressWarnings(print(plot))
+ggplot2::ggsave(filename =
+                  here("analysis/figures/Vectorized/Supplemental_Figure_2/D_Comparing_Viral_Gene_Expression_Between_Infected_Bystander_Mock_and_Empty.pdf"),
+                width = 8, height = 5)
+```
+
+# Prepare Infection State Assignment Variable
+
+```{r}
+### Remove Mock cells identified as infected
+Optimized_Seurat <- subset(Combined_Seurat$Ext_R1_Kim_scCoVseq,
+                           Infection_Sample == "Mock" &
+                             Infection_Classification_K_Medoid_2 == "Infected",
+                           invert = TRUE)
+
+### Define Infection_State as Mock for mock cells
+### and infected or bystander for SARS-CoV-2 cells
+Optimized_Seurat$Infection_State <- ifelse(
+  Optimized_Seurat$Infection_Sample == "Mock",
+  "Mock",
+  case_when(
+    Optimized_Seurat$Infection_Classification_K_Medoid_2 == "Uninfected" ~ "Bystander",
+    TRUE ~ Optimized_Seurat$Infection_Classification_K_Medoid_2)) %>% 
+  ### Set levels for infection state
+  factor(., levels = c("Mock", "Bystander", "Infected"))
+```
+
+# Figure 5: Perform DE Testing with Cells Downsampled to Equal Host UMIs
+
+## Perform downsampled edgeR analysis
+```{r}
+### Create a new Seurat object with viral genes removed
+host_genes <- rownames(Optimized_Seurat)[!rownames(Optimized_Seurat) %in% as.character(viral_genes)]
+edgeR_No_Virus <- DietSeurat(Optimized_Seurat,
+  counts = TRUE,
+  features = host_genes
+)
+
+### Check that cells across conditions are comparable for UMIs/cell
+VlnPlot(edgeR_No_Virus,
+  features = c("nCount_RNA"),
+  group.by = "Infection_State",
+  cols = Infection_Classification_Palette,
+  pt.size = 0
+)
+
+### Calculate median of nCount RNA by Infection Classification
+### and select the minimum across infection states
+min_q25 <- FetchData(edgeR_No_Virus,
+  vars = c("nCount_RNA", "Infection_State")
+) %>%
+  group_by(Infection_State) %>%
+  mutate(q25 = as.numeric(quantile(nCount_RNA, 0.25))) %>%
+  pull(q25) %>%
+  min()
+
+### Remove Cells below minimum 25th Percentile of nCount_RNA
+edgeR_No_Virus <- subset(edgeR_No_Virus, nCount_RNA >= min_q25)
+
+### Downsample to minimum 25th Percentile of nCount_RNA
+edgeR_No_Virus_Downsampled <- SampleUMI(edgeR_No_Virus@assays$RNA@counts,
+  max.umi = min_q25,
+  upsample = FALSE,
+  verbose = FALSE
+)
+
+### Add Downsampled Data to Original Object as New Assay
+edgeR_No_Virus[["Downsampled_RNA"]] <- CreateAssayObject(
+  counts = edgeR_No_Virus_Downsampled)
+
+### Plot nCount RNA After Downsampling Data
+VlnPlot(edgeR_No_Virus,
+  features = c("nCount_Downsampled_RNA"),
+  group.by = "Infection_State",
+  cols = Infection_Classification_Palette,
+  pt.size = 0
+)
+
+### Select Genes expressed in at least 10% of cells
+downsampled_genes_to_evaluate <- detect_expressed_genes(edgeR_No_Virus,
+  assay = "Downsampled_RNA",
+  threshold = 0.1
+)
+
+### Run edgeR to identify differentially expressed genes
+Infection_DE_test_downsampled <- run_edgeRQLFDetRate_ANOVA(edgeR_No_Virus,
+  assay = "Downsampled_RNA",
+  downsampled_genes_to_evaluate
+)
+
+### Select differentially expressed genes with FDR < 0.05 and logFC > 1
+Significant_DE_results_downsampled <- as.data.frame(
+  topTags(Infection_DE_test_downsampled, n = Inf))
+Significant_DE_results_downsampled <- subset(
+  Significant_DE_results_downsampled, FDR < 0.05 &
+  (abs(logFC.Infected_Mock) >= 1 | abs(logFC.Bystander_Mock) >= 1))
+Significant_DE_results_downsampled
+```
+
+## Visualize Downsampled Data with Heatmap
+
+```{r}
+### Add a column with the gene name of each differentially expressed gene
+Significant_DE_results_downsampled$Gene <- 
+  rownames(Significant_DE_results_downsampled)
+
+### Identify cells detected by Ext R1 and conventional 10X 5'
+shared_cells <- intersect(
+  colnames(Optimized_Seurat@assays$RNA@counts),
+  str_remove(
+    string = colnames(Combined_Seurat$FiveP_Kim_CellRanger@assays$RNA@counts),
+    pattern = "-1"
+  )
+)
+
+### Set the identity of the optimized seurat object to the infection state
+Idents(Optimized_Seurat) <- "Infection_State"
+
+### Downsample to the same number of cells per infection state
+cells_to_analyze <- WhichCells(Optimized_Seurat,
+  cells = shared_cells,
+  downsample = tally(group_by(.data = Optimized_Seurat@meta.data[shared_cells, ], Infection_State)) %>% pull(n) %>% min(),
+  seed = 12345
+)
+
+### Pull scaled expression values of differentially expressed genes for selected cells
+heatmap_data <- FetchData(
+  object = Optimized_Seurat,
+  vars = c(Significant_DE_results_downsampled$Gene),
+  cells = cells_to_analyze,
+  slot = "scale.data"
+)
+
+### Transpose heatmap data so genes are in rows and cells are in columns
+heatmap_data <- t(as.matrix(heatmap_data))
+
+### Pull scCoVseq measurements for gRNA/cell, total viral UMIs/cell, and
+### infection state for selected cells
+heatmap_scCoVseq_metadata <- FetchData(
+  object = Optimized_Seurat,
+  vars = c("gRNA", "nCount_Viral", "Infection_State"),
+  cells = cells_to_analyze,
+  slot = "counts"
+)
+
+### Format metadata labels
+colnames(heatmap_scCoVseq_metadata) <- mgsub(
+  pattern = c("gRNA", "nCount_Viral", "Infection_State"),
+  replacement = c(paste0("scCoVseq ", c("gRNA", "Total Viral UMIs")),
+                  "Assigned Infection Status"),
+  string = colnames(heatmap_scCoVseq_metadata)
+)
+
+### Pull CellRanger measurements for gRNA/cell and
+### total viral UMIs/cell for selected cells
+heatmap_CellRanger_metadata <- FetchData(
+  object = Combined_Seurat$FiveP_Kim_CellRanger,
+  vars = c("gRNA", "nCount_Viral"),
+  cells = paste0(cells_to_analyze, "-1"),
+  slot = "counts"
+)
+
+### Format metadata column labels
+colnames(heatmap_CellRanger_metadata) <- mgsub(
+  pattern = c("gRNA", "nCount_Viral"),
+  replacement = paste0("CellRanger ", c("gRNA", "Total Viral UMIs")),
+  string = colnames(heatmap_CellRanger_metadata)
+)
+
+### Add cell barcode column to scCoVseq and cellranger metadata
+heatmap_scCoVseq_metadata$Cell_BC <- rownames(heatmap_scCoVseq_metadata)
+heatmap_CellRanger_metadata$Cell_BC <- str_remove(
+  string = rownames(heatmap_CellRanger_metadata),
+  pattern = "-1$"
+)
+
+### Combine metadata tables
+heatmap_metadata <- full_join(
+  x = heatmap_scCoVseq_metadata,
+  y = heatmap_CellRanger_metadata,
+  by = "Cell_BC"
+)
+
+### Set rownames of metadata to cell barcode
+rownames(heatmap_metadata) <- heatmap_metadata$Cell_BC
+
+### Calculate log10(1+x) of CellRanger & scCoVseq gRNA & Total Viral UMIs per cell
+heatmap_metadata[,c(1,2,5,6)] <- log10(1 + heatmap_metadata[,c(1,2,5,6)])
+
+### Reorder metadata columns and remove cell barcode column
+heatmap_metadata <- heatmap_metadata[, c(
+  "scCoVseq gRNA",
+  "CellRanger gRNA",
+  "scCoVseq Total Viral UMIs",
+  "CellRanger Total Viral UMIs",
+  "Assigned Infection Status"
+)]
+
+### Prepare a color function for the cells of the heatmap
+Cells_Color_Fun <- circlize::colorRamp2(
+    breaks = seq(-2, 2, 4/10),
+    colors = rev(palettes_d$RColorBrewer$RdYlBu))
+
+### Prepare a color function for the numeric values in the annotation of the heatmap
+Annotation_Color_Fun <- circlize::colorRamp2(
+    breaks = seq(0, 4, 4/10000),
+    colors = viridis::viridis(10001))
+
+### Prepare a column annotation for the heatmap
+Cell_Annotation <- HeatmapAnnotation(df = heatmap_metadata,
+                  col = list(
+                    "scCoVseq gRNA" = Annotation_Color_Fun,
+                    "CellRanger gRNA" = Annotation_Color_Fun,
+                    "scCoVseq Total Viral UMIs" = Annotation_Color_Fun,
+                    "CellRanger Total Viral UMIs" = Annotation_Color_Fun,
+                    "Assigned Infection Status" = Infection_Classification_Palette[c(1:3)] 
+                  ),
+                  annotation_name_gp = gpar(fontsize = 8,
+                                            fontface = "bold",
+                                            fontfamily = "Helvetica"),
+                  
+                  show_legend = c(FALSE, FALSE, FALSE, TRUE, TRUE),
+                  annotation_legend_param = list(
+                    title_gp = gpar(fontsize = 8,
+                                            fontface = "bold",
+                                            fontfamily = "Helvetica"),
+                    labels_gp = gpar(fontsize = 6,
+                                            fontfamily = "Helvetica")))
+
+### Make heatmap and save
+pdf(file = paste0(vectorizedFiguresPath, "Supplemental_Figure_4/A_DE_Genes_Heatmap_Downsampled.pdf"), 
+    width = 6.5, height = 9)
+Heatmap(heatmap_data,
+        col = Cells_Color_Fun,
+        name = "Scaled\nExpression",
+        top_annotation = Cell_Annotation,
+        
+        cluster_columns = TRUE,
+        clustering_distance_columns = "euclidean",
+        clustering_method_columns = "ward.D2",
+        show_column_dend = TRUE,
+        show_column_names = FALSE,
+        column_dend_height = unit(5, "mm"),
+        column_dend_gp = gpar(lwd = 0.5),
+        
+        cluster_rows = TRUE,
+        clustering_distance_rows = "euclidean",
+        clustering_method_rows = "ward.D2",
+        show_row_dend = TRUE,
+        row_dend_width = unit(2.5, "mm"),
+        row_names_gp = gpar(fontsize = 6,
+                            fontfamily = "Helvetica"),
+        row_dend_gp = gpar(lwd = 0.5),
+        
+        heatmap_legend_param = list(title_gp = gpar(fontsize = 8,
+                                                    fontface = "bold",
+                                                    fontfamily = "Helvetica"),
+                                    labels_gp = gpar(fontsize = 6,
+                                                     fontfamily = "Helvetica")))
+dev.off()
+
+### Remove legends for annotations
+Cell_Annotation@anno_list$`CellRanger Total Viral UMIs`@show_legend <- FALSE
+Cell_Annotation@anno_list$`Assigned Infection Status`@show_legend <- FALSE
+
+### Plot heatmap without legend
+pdf(file = paste0(vectorizedFiguresPath, "Supplemental_Figure_4/A_DE_Genes_Heatmap_Downsampled_NoLegend.pdf"),
+    width = 6.5, height = 9)
+Heatmap(heatmap_data,
+        col = Cells_Color_Fun,
+        name = "Scaled\nExpression",
+        top_annotation = Cell_Annotation,
+        
+        cluster_columns = TRUE,
+        clustering_distance_columns = "euclidean",
+        clustering_method_columns = "ward.D2",
+        show_column_dend = TRUE,
+        show_column_names = FALSE,
+        column_dend_height = unit(5, "mm"),
+        column_dend_gp = gpar(lwd = 0.5),
+        
+        cluster_rows = TRUE,
+        clustering_distance_rows = "euclidean",
+        clustering_method_rows = "ward.D2",
+        show_row_dend = TRUE,
+        row_dend_width = unit(2.5, "mm"),
+        row_names_gp = gpar(fontsize = 6,
+                            fontfamily = "Helvetica"),
+        row_dend_gp = gpar(lwd = 0.5),
+        
+        show_heatmap_legend = FALSE)
+dev.off()
+```
+
+# Figure 5: Violin Plots of host genes colored by infection status expression
+
+```{r}
+### Select host genes from differential expression testing of non-downsampled data to visualize individually
+Interesting_Host_Genes <- c(
+  "JUN", "DUSP1", "NFKBIA",
+  "CALR", "METTL9", "IGFBP3",
+  "MYC", "C1QBP", "SERPINE1"
+)
+
+### Prepare violin plots of host genes of interest
+plot_1 <- VlnPlot(Optimized_Seurat,
+  features = Interesting_Host_Genes,
+  group.by = "Infection_State",
+  cols = Infection_Classification_Palette,
+  pt.size = 0,
+  combine = FALSE
+)
+
+### Format violin plots with publication theme and remove the legend
+plot_1 <- lapply(plot_1, function(x) {
+  x <- x + labs(x = element_blank()) +
+    publication_theme +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+  return(x)
+})
+
+### Hide the x axis labels
+for (i in 1:6) {
+  plot_1[[i]] <- plot_1[[i]] +
+    theme(
+      axis.text.x = element_blank(),
+      axis.title.x = element_blank()
+    )
+}
+
+### Hide the y axis title for all plots not in the first column middle row
+for (i in c(1:3, 5:9)) {
+  plot_1[[i]] <- plot_1[[i]] +
+    theme(axis.title.y = element_blank())
+}
+
+### Organize plots with patchwork
+wrap_plots(plot_1)
+
+### Save
+ggplot2::ggsave(
+  plot = last_plot(),
+  filename = paste0(vectorizedFiguresPath, "Supplemental_Figure_4/B_Host_Gene_Expression_Violin_Plots.pdf"),
+  width = 3.75, height = 3.25
+)
+```
+
+# Figure 5: KEGG analysis of differentially expressed genes
+
+```{r}
+### In order to run KEGG analysis, first prepare a gene_info file
+### for the African Green Monkey reference. This is used in the 
+### KEGG analysis to convert gene aliases to NCBI symbols. 
+
+### Download NCBI gene_info file for all mammalia
+download.file(
+  url = "https://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/All_Mammalia.gene_info.gz",
+  destfile = here("analysis/paper/gene_info.gz"),
+  quiet = TRUE,
+  method = "wget")
+
+### Unzip gene_info file
+R.utils::gunzip(filename = here("analysis/paper/gene_info.gz"))
+
+### Import gene_info file
+chl_sab1_gene_info <- read.delim(file = here("analysis/paper/gene_info"),
+                                 header = TRUE)
+
+### Subset to data with taxon id 60711 for African Green Monkey
+chl_sab1_gene_info <- subset(chl_sab1_gene_info, X.tax_id == 60711)
+
+### Run edgeR to identify pairwise differential expressed genes for KEGG Analysis
+Infection_DE_test_paired <- run_edgeRQLFDetRate(edgeR_No_Virus,
+  assay = "Downsampled_RNA",
+  downsampled_genes_to_evaluate
+)
+
+### Perform KEGG enrichment analysis on pairwise edgeR output
+kegg_analysis <- lapply(Infection_DE_test_paired, function(x) {
+  output <- kegga(
+    de = x,
+    geneid = alias2SymbolUsingNCBI(
+      alias = rownames(x),
+      gene.info.file = chl_sab1_gene_info)$GeneID,
+    species.KEGG = "csab",
+    convert = FALSE,
+    restrict.universe = TRUE
+  )
+  return(output)
+})
+
+### Add the name of each pairwise comparison to the KEGG output
+for (i in names(kegg_analysis)) {
+  kegg_analysis[[i]]$Comparison <- rep.int(i, times = nrow(kegg_analysis[[i]]))
+}
+
+### Reorganize the p values into one column and 
+### specify the directionality that the significance is measuring
+kegg_analysis <- lapply(kegg_analysis, function(x) {
+  x <- pivot_longer(x,
+    cols = c(P.Down, P.Up),
+    names_to = "Direction",
+    values_to = "P_Value"
+  )
+  return(x)
+})
+
+### Select the KEGG pathways with the 10 lowest p values for each pairwise comparison
+top_keggs <- lapply(kegg_analysis, function(x) {
+  output <- arrange(.data = x, P_Value) %>%
+    top_n(n = -10, wt = P_Value) %>%
+    pull(Pathway)
+  return(output)
+})
+
+### Reformat the top KEGG pathways into one vector and select only unique pathways
+top_keggs <- unique(unlist(top_keggs))
+
+### Combine all KEGG results into one dataframe
+kegg_to_plot <- bind_rows(kegg_analysis)
+
+### Subset KEGG output to top KEGG pathways
+kegg_to_plot <- subset(kegg_to_plot, Pathway %in% top_keggs)
+
+### Calculate a -log10 p value
+kegg_to_plot$log_p <- -log10(kegg_to_plot$P_Value)
+
+### To separate p values for enrichment in one category versus another,
+### multiple -log10 p value by -1 if it is enriched in the "down" comparison
+kegg_to_plot$log_p <- ifelse(kegg_to_plot$Direction == "P.Down",
+  -1 * kegg_to_plot$log_p,
+  kegg_to_plot$log_p
+)
+
+### Arrange the data by the direction of the enrichment and then by lowest p value first
+kegg_to_plot <- arrange(kegg_to_plot, desc(Direction), P_Value)
+
+### Make KEGG pathway a factor and set the levels based on
+### the order of direction then lowest p value first,
+### then reverse this order because we want
+### the order to go from top to bottom on the y axis
+kegg_to_plot$Pathway <- factor(kegg_to_plot$Pathway,
+  levels = unique(kegg_to_plot$Pathway)
+)
+
+### Make the pairwise comparisons a factor
+kegg_to_plot$Comparison <- factor(kegg_to_plot$Comparison,
+  levels = c(
+    "Infected_Mock",
+    "Infected_Bystander",
+    "Bystander_Mock"
+  )
+)
+
+### Designate KEGG enrichment as significant if the p value is less than 0.001
+kegg_to_plot$Significant <- ifelse(kegg_to_plot$P_Value < 0.001,
+  TRUE, FALSE
+)
+
+### Reformat direction
+kegg_to_plot$Direction <- str_remove(
+  string = kegg_to_plot$Direction,
+  pattern = "P\\.") %>% factor(., levels = c("Down", "Up"))
+
+### Order data by direction then P value
+kegg_to_plot <- kegg_to_plot %>% arrange(desc(Direction), P_Value)
+
+### Store KEGG pathway as a factor and set order
+kegg_to_plot$Pathway <- factor(kegg_to_plot$Pathway,
+                               levels = unique(kegg_to_plot$Pathway))
+
+### Prepare a labeller to reformat the pairwise comparison names
+comparison_labeller <- c(
+  Infected_Mock = "Infected - Mock",
+  Infected_Bystander = "Infected - Bystander",
+  Bystander_Mock = "Bystander - Mock"
+)
+
+### Plot as dot plot
+kegg_dotplot <- ggplot(kegg_to_plot,
+                       aes(x = Pathway,
+                           y = Direction,
+                           size = abs(log_p))) +
+  geom_point(
+    data = subset(kegg_to_plot, Significant == TRUE),
+    aes(
+      fill = log_p,
+      color = log_p
+    ),
+    shape = 21
+  ) +
+  geom_point(
+    data = subset(kegg_to_plot, Significant == FALSE),
+    color = "grey50",
+    fill = "white",
+    shape = 21
+  ) +
+  facet_wrap(
+    facets = vars(Comparison),
+    labeller = labeller(Comparison = comparison_labeller),
+    nrow = 3
+  ) +
+  scale_fill_paletteer_c("grDevices::RdBu",
+    direction = -1,
+    limits = c(-12.5, 12.5),
+    labels = abs
+  ) +
+  scale_color_paletteer_c("grDevices::RdBu",
+    direction = -1,
+    limits = c(-12.5, 12.5),
+    labels = abs
+  ) +
+  scale_x_discrete(limits = levels(kegg_to_plot$Pathway)) +
+  publication_theme +
+  labs(
+    y = element_blank(),
+    x = element_blank(),
+    size = "-log(p)",
+    fill = "-log(p)",
+    color = "-log(p)",
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "right",
+    plot.background = element_blank(),
+    strip.placement = "outside",
+    strip.background = element_blank()
+  )
+
+### Plot
+kegg_dotplot
+
+### Save Legend
+ggplot2::ggsave(
+  filename = paste0(vectorizedFiguresPath, "Supplemental_Figure_4/C_KEGG_Analysis_Dot_Plot_Legend.pdf"),
+  plot = get_legend(kegg_dotplot),
+  width = 3.75, height = 4
+)
+
+kegg_dotplot <- kegg_dotplot + NoLegend()
+
+### Save Plot
+ggplot2::ggsave(
+  filename = paste0(vectorizedFiguresPath, "Supplemental_Figure_4/C_KEGG_Analysis_Dot_Plot.pdf"),
+  plot = kegg_dotplot,
+  width = 3.75, height = 4
+)
+```
+
+# Supplemental Figure 5C: Compare Infection Classification with Other Methods
+
+## Import infection classification from scCoVseq data
+
+```{r}
+### Select objects analyzed with scCoVseq
+Optimized_Seurat <- Combined_Seurat[grep(
+  pattern = "scCoVseq$",
+  x = names(Combined_Seurat),
+  value = TRUE
+)]
+
+### Pull infection classifications and metadata from Seurat Objects
+infection_classifications <- lapply(Optimized_Seurat, FetchData,
+  vars = c(
+    "Infection_Sample",
+    "Infection_Classification_K_Medoid_2",
+    "Sequencing_Strategy",
+    "Quantification_Strategy"
+  )
+)
+
+### Count number of infected cells per sample and calculate percent infection
+infection_classifications <- lapply(infection_classifications, function(x) {
+  x <- x %>%
+    ### Calculate total number of cells in the sample
+    group_by(Infection_Sample) %>%
+    add_tally(name = "Cells_per_Sample") %>%
+    ### Calculate number of cells classified as infected by classification method
+    group_by(Infection_Sample, Infection_Classification_K_Medoid_2) %>%
+    add_tally(name = "Infected_Cells_per_Sample") %>%
+    ### Remove duplicate rows
+    distinct() %>%
+    ### Pivot data so number of infected cells is a column
+    pivot_wider(
+      names_from = Infection_Classification_K_Medoid_2,
+      values_from = Infected_Cells_per_Sample)
+  ### Set NAs (derived from samples with no infected cells, eg Mock) to 0 infected cells
+  x[is.na(x$Infected), "Infected"] <- 0
+  ### Calculate percent infection per sample
+  x <- x %>% mutate(Percent_Infected = Infected / Cells_per_Sample)
+  ### Remove Quantification Strategy Column
+  x <- x %>% dplyr::select(!c(Quantification_Strategy, Uninfected))
+  return(x)
+})
+
+### Combine dataframes into one
+infection_classifications <- bind_rows(infection_classifications)
+
+### Add an Assay matadata column
+infection_classifications$Assay <- "scRNAseq"
+
+### Rename Columns
+colnames(infection_classifications) <- c(
+  "Infection_Sample",
+  "Sample",
+  "Cells_per_Sample",
+  "Infected_Cells_per_Sample",
+  "Percent_Infected",
+  "Assay"
+)
+
+### Calculate mean and standard deviation of percent infection of all fields per sample and 
+### upper and lower error bar (mean +/- 1 standard deviation, respectively)
+infection_classifications <- infection_classifications %>% 
+  group_by(Infection_Sample, Sample) %>%
+  mutate(Mean_Percent_Infected = mean(Percent_Infected),
+         Std_Percent_Infected = sd(Percent_Infected)) %>%
+  ungroup() %>%
+  mutate(
+    Upper_Error_Percent_Infected = Mean_Percent_Infected + Std_Percent_Infected,
+    Lower_Error_Percent_Infected = Mean_Percent_Infected - Std_Percent_Infected)
+```
+
+## Import flow cytometry infection classification data
+
+```{r}
+Flow_Cytometry_Files <- list.files(
+  path = here("analysis/data/raw_data/Flow_Cytometry"),
+  full.names = TRUE,
+  pattern = "^Vero"
+)
+names(Flow_Cytometry_Files) <- list.files(
+  path = here("analysis/data/raw_data/Flow_Cytometry"),
+  pattern = "^Vero"
+)
+
+### Import Flow Cytometry Data
+Flow_Cytometry_Files <- lapply(Flow_Cytometry_Files, read.csv)
+
+### Subset data to permeabilized cells stained for SARS-CoV-2 N protein
+Flow_Cytometry_Files <- lapply(Flow_Cytometry_Files, 
+                               subset,
+                               Antigen == "NP" & Permeabilization == "perm")
+
+### Add Sample metadata to flow cytometry data
+Flow_Cytometry_Files$`Vero_3'_FC_Infected_Counts.csv`$Sample <- rep("10X 3'")
+Flow_Cytometry_Files$`Vero_5'_FC_Infected_Counts.csv`$Sample <- rep("10X 5'")
+
+### Remove unnecessary columns
+Flow_Cytometry_Files$`Vero_3'_FC_Infected_Counts.csv` <-
+  dplyr::select(
+    Flow_Cytometry_Files$`Vero_3'_FC_Infected_Counts.csv`, !c(Permeabilization, Antigen))
+Flow_Cytometry_Files$`Vero_5'_FC_Infected_Counts.csv` <-
+  dplyr::select(
+    Flow_Cytometry_Files$`Vero_5'_FC_Infected_Counts.csv`, !c(X, Permeabilization, Antigen))
+
+### Format flow cytometry data
+Flow_Cytometry_Files <- lapply(Flow_Cytometry_Files, function(x) {
+  ### Only include data with all measurements
+  # x <- x[complete.cases(x), ]
+  ### Reorder columns to match
+  x <- x[, c("Infection", "n_NP.", "n_Cells", "Sample")]
+  ### Rename columns to match measurements from scRNAseq above
+  colnames(x) <- c(
+    "Infection_Sample",
+    "Infected_Cells_per_Sample",
+    "Cells_per_Sample",
+    "Sample"
+  )
+  ### Reformat Infection Sample Names
+  x$Infection_Sample <- str_replace(x$Infection_Sample, "Inf", "SARS-CoV-2")
+  ### Calculate percent infection
+  x$Percent_Infected <- x$Infected_Cells_per_Sample / x$Cells_per_Sample
+  ### Add Assay metadata column
+  x$Assay <- rep("Flow Cytometry")
+  return(x)
+})
+
+### Combine Flow Cytometry dataframes into one
+Flow_Cytometry_Files <- bind_rows(Flow_Cytometry_Files)
+
+### Calculate mean, standard deviation, upper, and lower error bar (mean +/- 1 standard deviation, respectively) of percent infection of all fields per sample
+Flow_Cytometry_Files <- Flow_Cytometry_Files %>% group_by(Infection_Sample,
+                                  Sample) %>%
+  mutate(Mean_Percent_Infected = mean(Percent_Infected),
+         Std_Percent_Infected = sd(Percent_Infected)) %>%
+  ungroup() %>%
+  mutate(Upper_Error_Percent_Infected = Mean_Percent_Infected + Std_Percent_Infected,
+         Lower_Error_Percent_Infected = Mean_Percent_Infected - Std_Percent_Infected)
+```
+
+## Import immunofluorescence data
+```{r}
+IF_Files <- list.files(
+  path = here("analysis/data/raw_data/Immunofluorescence"),
+  full.names = TRUE
+)
+names(IF_Files) <- list.files(
+  path = here("analysis/data/raw_data/Immunofluorescence"))
+
+### Load in immunofluorescence data
+IF_Files <- read.csv(IF_Files)
+
+### Remove unnecessary columns
+IF_Files <- dplyr::select(IF_Files, !c(X, Field, Acquisition_Sample, Var2, Freq, x, freq, Percent_Microscopy, Infection_Sample))
+
+### Rename columns to match measurements from scRNAseq above
+colnames(IF_Files) <- c(
+  "Infection_Sample",
+  "Sample",
+  "Cells_per_Sample",
+  "Infected_Cells_per_Sample"
+)
+
+### Add metadata columns
+IF_Files <- IF_Files %>%
+  mutate(Assay = rep("Immunofluorescence"),
+         Sample = str_replace(Sample,
+                              pattern = "_",
+                              replacement = " "),
+         ### Calculate percent of cells infected
+         Percent_Infected = Infected_Cells_per_Sample / Cells_per_Sample
+         ) %>%
+  group_by(Infection_Sample, Sample) %>%
+  ### Calculate mean and sd percent infected
+  mutate(Mean_Percent_Infected = mean(Percent_Infected),
+         Std_Percent_Infected = sd(Percent_Infected)) %>%
+  ungroup() %>%
+  ### Calculate upper and lower error bar
+  mutate(
+    Upper_Error_Percent_Infected = Mean_Percent_Infected + Std_Percent_Infected,
+    Lower_Error_Percent_Infected = Mean_Percent_Infected - Std_Percent_Infected)
+```
+
+## Combine IF, Flow Cytometry, and scCoVseq infection classification data
+
+```{r}
+### Reorder Flow_Cytometry and IF columns to match scRNAseq data
+Flow_Cytometry_Files <- Flow_Cytometry_Files[, colnames(infection_classifications)]
+IF_Files <- IF_Files[, colnames(infection_classifications)]
+
+### Combine data from flow cytometry, IF, and scRNAseq into one dataframe
+infection_classifications <- rbind(
+  infection_classifications,
+  Flow_Cytometry_Files,
+  IF_Files
+)
+
+### Duplicate 10X 5' data for 10X 5' Extended R1
+five_prime_orthologous_assays <- subset(
+  infection_classifications,
+  Sample == "10X 5'" &
+    Assay != "scRNAseq" 
+)
+
+### Change sample name to 10X 5' Extended R1
+five_prime_orthologous_assays$Sample <- "10X 5'\nExtended R1"
+
+### Add 10X 5' Extended R1 Data to dataframe
+infection_classifications <- rbind(
+  infection_classifications,
+  five_prime_orthologous_assays
+)
+
+### Plot Infection Classification by Assay
+Infection_Classification_Plot <- ggplot(
+  infection_classifications,
+  aes(x = Infection_Sample, y = Mean_Percent_Infected, fill = Assay, ymin = Lower_Error_Percent_Infected, ymax = Upper_Error_Percent_Infected)
+) +
+  geom_col(position = "dodge") +
+  geom_errorbar(position = "dodge") +
+  labs(y = "Percent Infected",
+       x = element_blank()) +
+  facet_grid(cols = vars(Sample)) +
+  scale_fill_manual(values = Assay_Palette) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::percent) +
+  publication_theme +
+  theme(
+    legend.position = "right",
+    axis.text.x = element_text(hjust = 1, angle = 45),
+    strip.background = element_blank()
+  )
+
+### Isolate legend from plot
+Infection_Classification_Legend <- cowplot::get_legend(Infection_Classification_Plot)
+
+### Draw legend
+cowplot::ggdraw(Infection_Classification_Legend)
+
+### Save legend separately
+ggplot2::ggsave(
+  filename = paste0(vectorizedFiguresPath, "Supplemental_Figure_3/D_Comparing_Infection_Classification_by_Method_Legend.pdf"),
+  width = 3, units = "in", dpi = 1200
+)
+
+### Remove legend from plot
+Infection_Classification_Plot <- Infection_Classification_Plot + theme(legend.position = "none")
+
+### Draw plot
+Infection_Classification_Plot
+
+### Save
+ggplot2::ggsave(
+  filename = paste0(
+    vectorizedFiguresPath,
+    "Supplemental_Figure_3/D_Comparing_Infection_Classification_by_Method_NoLegend.pdf"
+    ),
+  height = 4, width = 3, units = "in", dpi = 1200)
+```
+
+# Plot viral gene correlation among Veros
+
+```{r}
+## Pull viral gene expression data
+Viral_Gene_Expression_Vero <- lapply(
+  Optimized_Seurat,
+  FetchData,
+  vars = c(as.character(viral_genes),
+           "nCount_Viral",
+           "Infection_Classification_K_Medoid_2"),
+  slot = "data")
+
+### Arrange cells in order of increasing total viral UMIs
+Viral_Gene_Expression_Vero <- lapply(Viral_Gene_Expression_Vero,
+                                            arrange,
+                                            nCount_Viral)
+
+### Transpose matrix so viral genes are rows
+Viral_Gene_Expression_Mat <- lapply(
+  Viral_Gene_Expression_Vero, function(x){
+    x <- t(x[, as.character(viral_genes)])
+    return(x)
+    })
+
+### Make heatmap of viral gene expression per cell
+pdf(
+  file = here("analysis/figures/Vectorized/Figure_4/D_Vero_Ext_R1_viral_UMIs.pdf")
+  )
+pheatmap(Viral_Gene_Expression_Mat$Ext_R1_Kim_scCoVseq,
+         scale = "none",
+         border_color = NA,
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         show_colnames = FALSE,
+         annotation_col = data.frame(
+           Total_SARSCoV2_UMIs = scales::oob_squish_any(
+             x = Viral_Gene_Expression_Vero$Ext_R1_Kim_scCoVseq[, "nCount_Viral"],
+             range = 
+               c(0, as.numeric(
+                 quantile(Viral_Gene_Expression_Vero$Ext_R1_Kim_scCoVseq$nCount_Viral, 0.99)))
+             ),
+           Infection_Status = 
+             Viral_Gene_Expression_Vero$Ext_R1_Kim_scCoVseq[, "Infection_Classification_K_Medoid_2"],
+           row.names = rownames(Viral_Gene_Expression_Vero$Ext_R1_Kim_scCoVseq)),
+         legend = TRUE,
+         annotation_legend = TRUE,
+         color = as.character(paletteer_c(`"viridis::magma"`, n = 1000)),
+         annotation_colors = list(
+           Total_SARSCoV2_UMIs = as.character(paletteer_c(`"viridis::viridis"`,
+                                                          n = 1000)),
+           Infection_Status = Infection_Classification_Palette[c("Infected",
+                                                                 "Uninfected")]),
+         fontsize = 6)
+dev.off()
+
+### Plot without legend
+pdf(
+  file = here("analysis/figures/Vectorized/Figure_4/D_Vero_Ext_R1_viral_UMIs_no_Legend.pdf"),
+  width = 3,
+  height = 1.5)
+pheatmap(Viral_Gene_Expression_Mat$Ext_R1_Kim_scCoVseq,
+         scale = "none",
+         border_color = NA,
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         show_colnames = FALSE,
+         ### Set max value SARS-CoV-2 UMIs to the 99th percentile for visualization
+         annotation_col = data.frame(
+           Total_SARSCoV2_UMIs = scales::oob_squish_any(
+             x = Viral_Gene_Expression_Vero$Ext_R1_Kim_scCoVseq[, "nCount_Viral"],
+             range = c(0, as.numeric(
+               quantile(Viral_Gene_Expression_Vero$Ext_R1_Kim_scCoVseq$nCount_Viral, 0.99)
+               ))),
+           Infection_Status = Viral_Gene_Expression_Vero$Ext_R1_Kim_scCoVseq[, "Infection_Classification_K_Medoid_2"],
+           row.names = rownames(Viral_Gene_Expression_Vero$Ext_R1_Kim_scCoVseq)),
+         legend = FALSE,
+         annotation_legend = FALSE,
+         color = as.character(paletteer_c(`"viridis::magma"`, n = 1000)),
+         annotation_colors = list(
+           Total_SARSCoV2_UMIs = as.character(paletteer_c(`"viridis::viridis"`,
+                                                          n = 1000)),
+           Infection_Status = Infection_Classification_Palette[c("Infected",
+                                                                 "Uninfected")]),
+         fontsize = 6)
+dev.off()
+```
+
+# Import A549 scCoVseq data
+```{r}
+### Find paths to A549 Data
+A549 <- list.files(path = here("analysis/data/raw_data/A549_SARSCoV2_scCoVseq"),
+                   pattern = ".rds$",
+                   full.names = TRUE)
+
+names(A549) <- list.files(
+  path = here("analysis/data/raw_data/A549_SARSCoV2_scCoVseq"),
+  pattern = ".rds$") %>%
+  str_remove(pattern = "^count_") %>%
+  str_remove(pattern = "A549_") %>%
+  str_remove(pattern = "_Gene_Cell_Matrix.rds")
+
+### Subset to M58R data
+A549 <- A549[c("M58R", "Mock_1")]
+
+### Import data
+A549 <- lapply(A549, readRDS)
+
+### Create Seurat Object
+A549 <- lapply(names(A549), function(i){
+  output <- CreateSeuratObject(A549[[i]], project = i)
+  return(output)
+  })
+
+### Remove ambiguous UMIs
+A549 <- lapply(A549, Remove_Ambiguous_UMIs)
+
+### Add percent mitochondrial gene expression to A549
+A549 <- lapply(A549, PercentageFeatureSet, pattern = "^MT-",
+               col.name = "percent_mito")
+
+### Add percent viral gene expression to A549
+A549 <- lapply(A549, PercentageFeatureSet, 
+               features = viral_genes, col.name = "percent_viral")
+
+### Calculate nCount_Viral
+A549 <- lapply(A549, calculate_viral_nUMIs, genes = viral_genes)
+
+### Plot QC Data
+lapply(A549, function(x){
+  VlnPlot(x, features = c("nCount_RNA", 
+                           "nFeature_RNA", 
+                           "percent_mito")) + 
+    plot_annotation(title = unique(x$orig.ident))
+})
+
+lapply(A549, function(x){
+  plot <- FeatureScatter(x,
+               feature1 = "nCount_RNA",
+               feature2 = "nFeature_RNA") + NoLegend() |
+  FeatureScatter(x,
+               feature1 = "nCount_RNA",
+               feature2 = "percent_mito") + NoLegend() |
+  FeatureScatter(x,
+               feature1 = "nFeature_RNA",
+               feature2 = "nCount_Viral") + NoLegend() |
+  FeatureScatter(x,
+               feature1 = "nCount_RNA",
+               feature2 = "nCount_Viral") + NoLegend()
+  plot + plot_annotation(title = unique(x$orig.ident))
+  })
+```
+
+Remove cells with:
+  nCount_RNA < 5000
+  nFeature_RNA < 1000
+  percent_mito > 10
+
+# Filter data based on QC  
+```{r}
+### Filter data
+A549_Filtered <- lapply(A549, subset,
+                        nCount_RNA > 5000 & nFeature_RNA > 1000 & percent_mito < 10)
+
+### Plot QC Data from filtered data
+lapply(A549_Filtered, function(x){
+  VlnPlot(x, features = c("nCount_RNA", 
+                           "nFeature_RNA", 
+                           "percent_mito")) + 
+    plot_annotation(title = unique(x$orig.ident))
+})
+
+lapply(A549_Filtered, function(x){
+  plot <- FeatureScatter(x,
+               feature1 = "nCount_RNA",
+               feature2 = "nFeature_RNA") + NoLegend() |
+  FeatureScatter(x,
+               feature1 = "nCount_RNA",
+               feature2 = "percent_mito") + NoLegend() |
+  FeatureScatter(x,
+               feature1 = "nFeature_RNA",
+               feature2 = "nCount_Viral") + NoLegend() |
+  FeatureScatter(x,
+               feature1 = "nCount_RNA",
+               feature2 = "nCount_Viral") + NoLegend()
+  plot + plot_annotation(title = unique(x$orig.ident))
+  })
+```
+
+# Classify infected cells
+```{r}
+### Replace original object with filtered object
+A549 <- A549_Filtered
+
+### Delete filtered object
+rm(A549_Filtered)
+
+### Merge Mock and Infected Sample
+A549 <- merge(x = A549[[1]],
+              y = A549[[2]])
+
+### Normalize data
+A549 <- NormalizeData(A549, 
+                      normalization.method = "LogNormalize",
+                      verbose = FALSE)
+
+### Scale data
+A549 <- ScaleData(A549,
+                  verbose = FALSE)
+
+### Classify infected cells
+A549 <- classify_infection_status_k_medoid(A549,
+                                        genes = as.character(viral_sgmRNA),
+                                        k = 2)
+
+### Plot viral gene expression by infection status
+DoHeatmap(A549,
+          features = as.character(viral_genes),
+          group.by = "Infection_Classification_K_Medoid_2")
+```
+
+# Prepare Infection State Assignment Variable
+```{r}
+### Remove Mock cells identified as infected
+A549 <- subset(
+  A549,
+  orig.ident == "Mock_1" & Infection_Classification_K_Medoid_2 == "Infected",
+  invert = TRUE)
+
+### Define Infection_State as Mock for mock cells and infected/bystander for SARS-CoV-2 cells
+A549$Infection_State <- ifelse(A549$orig.ident == "Mock_1",
+  "Mock",
+  case_when(
+    A549$Infection_Classification_K_Medoid_2 == "Uninfected" ~ "Bystander",
+    TRUE ~ A549$Infection_Classification_K_Medoid_2)) %>% 
+  ### Set levels for infection state
+  factor(., levels = c("Mock", "Bystander", "Infected"))
+```
+
+# Figure 3: Compare Bulk RNAseq and scCoVseq 
+
+##Import Bulk RNAseq Data
+```{r}
+### Point to files
+periscope_counts <- list.files(
+  path = here("analysis/data/raw_data/Bulk_RNAseq/Periscope"),
+  pattern = "_counts.csv$",
+  full.names = TRUE)
+names(periscope_counts) <- str_remove(string = list.files(path = here("analysis/data/raw_data/Bulk_RNAseq/Periscope"),
+                               pattern = "_counts.csv$"),
+                               pattern = "_periscope_periscope_counts.csv")
+
+### Import data
+periscope_counts <- lapply(periscope_counts, read.csv)
+
+### Subset data to M58R samples
+periscope_counts <- periscope_counts[grep(
+  pattern = "^M58R", x = names(periscope_counts))]
+
+### Combine dataframes
+periscope_counts <- bind_rows(periscope_counts)
+
+### Split sample 
+periscope_counts <- periscope_counts %>% 
+  separate(col = sample,
+           into = c("condition", "replicate", NA),
+           remove = FALSE)
+
+### Calculate fraction of reads per ORF
+periscope_counts$sgmRNA_fraction <- periscope_counts$sgRNA_count / periscope_counts$mapped_reads
+
+### Subset to ORFs of interest
+periscope_counts <- subset(periscope_counts, orf %in% as.character(viral_sgmRNA))
+
+### Subset data to M58R
+periscope_counts <- subset(periscope_counts,
+                           condition == "M58R")
+
+### Set levels for ORF
+periscope_counts$orf <- factor(periscope_counts$orf,
+                               levels = as.character(viral_sgmRNA))
+```
+
+## Prepare A549 scCoVseq pseudobulk data
+```{r}
+### Calculate A549 Pseudobulk Viral Gene Expression
+A549_Pseudobulk <- FetchData(A549,
+                             vars = c(as.character(viral_genes)),
+                             slot = "counts") %>%
+  Matrix::colSums()
+
+### Calculate Total viral counts per sample
+A549_Pseudobulk$Total <- sum(A549_Pseudobulk)
+
+### Pivot data
+A549_Pseudobulk <- as.data.frame(A549_Pseudobulk) %>% 
+  pivot_longer(cols = all_of(viral_genes), names_to = "Gene", values_to = "Counts") 
+
+### Calculate sgmRNA fraction of total viral counts
+A549_Pseudobulk$sgmRNA_fraction <- A549_Pseudobulk$Counts / A549_Pseudobulk$Total
+
+### Add scCoVseq to Sample
+A549_Pseudobulk$Sample <- "M58R_scCoVseq"
+
+### Identify ORFs shared between periscope and scCoVseq
+shared_orfs <- intersect(A549_Pseudobulk$Gene,
+                         periscope_counts$orf)
+
+### Subset dataframes to shared ORFs
+A549_Pseudobulk <- subset(A549_Pseudobulk, Gene %in% shared_orfs)
+```
+
+## Compare scCoVseq trim R1 Pseudobulk vs Bulk RNAseq
+
+```{r}
+### Import CellRanger files
+scCoVseq_A549_Trim_R1 <- readRDS(
+  file = here("analysis/data/raw_data/A549_SARSCoV2_scCoVseq/count_A549_M58R_trim_R1_Gene_Cell_Matrix.rds"))
+
+### Create Seurat Object
+scCoVseq_A549_Trim_R1 <- CreateSeuratObject(scCoVseq_A549_Trim_R1)
+
+### Remove ambiguous UMIs
+scCoVseq_A549_Trim_R1 <- Remove_Ambiguous_UMIs(scCoVseq_A549_Trim_R1)
+
+### Subset Seurat Object to the same cells in the scCoVseq derived data
+scCoVseq_A549_Trim_R1 <- subset(scCoVseq_A549_Trim_R1,
+                                 cells = str_remove(
+                                   string = WhichCells(A549,
+                                                       expression = orig.ident == "M58R"
+                                                       ),
+                                   pattern = "_1")
+                                )
+
+### Calculate A549 Pseudobulk Viral Gene Expression
+scCoVseq_A549_Trim_R1 <- FetchData(
+  scCoVseq_A549_Trim_R1,
+  vars = c(as.character(viral_genes)),
+  slot = "counts") %>%
+  Matrix::colSums()
+
+### Calculate Total viral counts per sample
+scCoVseq_A549_Trim_R1$Total <- sum(scCoVseq_A549_Trim_R1)
+
+### Pivot data
+scCoVseq_A549_Trim_R1 <- as.data.frame(scCoVseq_A549_Trim_R1) %>% 
+  pivot_longer(cols = all_of(viral_genes), names_to = "Gene", values_to = "Counts") 
+
+### Calculate sgmRNA fraction of total viral counts
+scCoVseq_A549_Trim_R1$sgmRNA_fraction <- scCoVseq_A549_Trim_R1$Counts / scCoVseq_A549_Trim_R1$Total
+
+### Add scCoVseq to Sample
+scCoVseq_A549_Trim_R1$Sample <- "M58R_ExtR1_CellRanger"
+
+### Identify ORFs shared between periscope and scCoVseq
+shared_orfs <- intersect(scCoVseq_A549_Trim_R1$Gene,
+                         periscope_counts$orf)
+
+### Subset dataframes to shared ORFs
+scCoVseq_A549_Trim_R1 <- subset(scCoVseq_A549_Trim_R1, Gene %in% shared_orfs)
+```
+
+## Compare CellRanger Ext R1 Pseudobulk vs Bulk RNAseq
+```{r}
+### Import CellRanger files
+CellRanger_A549_Ext_R1 <- Read10X_h5(filename = here("analysis/data/raw_data/A549_SARSCoV2_scCoVseq/A549_M58R_ext_R1.h5"))
+
+### Create Seurat Object
+CellRanger_A549_Ext_R1 <- CreateSeuratObject(counts = CellRanger_A549_Ext_R1)
+
+### Subset Seurat Object to the same cells in the scCoVseq derived data
+CellRanger_A549_Ext_R1 <- subset(CellRanger_A549_Ext_R1,
+                                 cells = str_replace(
+                                   string = WhichCells(A549,
+                                                       expression = orig.ident == "M58R"),
+                                   pattern = "_",
+                                   replacement = "-"))
+
+### Calculate A549 Pseudobulk Viral Gene Expression
+CellRanger_A549_Ext_R1 <- FetchData(CellRanger_A549_Ext_R1,
+                             vars = c(as.character(viral_genes)),
+                             slot = "counts") %>%
+  Matrix::colSums()
+
+### Calculate Total viral counts per sample
+CellRanger_A549_Ext_R1$Total <- sum(CellRanger_A549_Ext_R1)
+
+### Pivot data
+CellRanger_A549_Ext_R1 <- as.data.frame(CellRanger_A549_Ext_R1) %>% 
+  pivot_longer(cols = all_of(viral_genes), names_to = "Gene", values_to = "Counts") 
+
+### Calculate sgmRNA fraction of total viral counts
+CellRanger_A549_Ext_R1$sgmRNA_fraction <- CellRanger_A549_Ext_R1$Counts / CellRanger_A549_Ext_R1$Total
+
+### Add scCoVseq to Sample
+CellRanger_A549_Ext_R1$Sample <- "M58R_ExtR1_CellRanger"
+
+### Identify ORFs shared between periscope and scCoVseq
+shared_orfs <- intersect(CellRanger_A549_Ext_R1$Gene,
+                         periscope_counts$orf)
+
+### Subset dataframes to shared ORFs
+CellRanger_A549_Ext_R1 <- subset(CellRanger_A549_Ext_R1, Gene %in% shared_orfs)
+```
+
+## Compare CellRanger Trimmed R1 Pseudobulk vs Bulk RNAseq
+```{r}
+### Import CellRanger files
+CellRanger_A549_Trim_R1 <- Read10X_h5(filename = here("analysis/data/raw_data/A549_SARSCoV2_scCoVseq/A549_M58R_trim_R1.h5"))
+
+### Create Seurat Object
+CellRanger_A549_Trim_R1 <- CreateSeuratObject(counts = CellRanger_A549_Trim_R1)
+
+### Subset Seurat Object to the same cells in the scCoVseq derived data
+CellRanger_A549_Trim_R1 <- subset(
+  CellRanger_A549_Trim_R1,
+  cells = str_replace(
+    string = WhichCells(A549, expression = orig.ident == "M58R"),
+    pattern = "_",
+    replacement = "-"))
+
+### Calculate A549 Pseudobulk Viral Gene Expression
+CellRanger_A549_Trim_R1 <- FetchData(CellRanger_A549_Trim_R1,
+                             vars = c(as.character(viral_genes)),
+                             slot = "counts") %>%
+  Matrix::colSums()
+
+### Calculate Total viral counts per sample
+CellRanger_A549_Trim_R1$Total <- sum(CellRanger_A549_Trim_R1)
+
+### Pivot data
+CellRanger_A549_Trim_R1 <- as.data.frame(CellRanger_A549_Trim_R1) %>% 
+  pivot_longer(cols = all_of(viral_genes), names_to = "Gene", values_to = "Counts") 
+
+### Calculate sgmRNA fraction of total viral counts
+CellRanger_A549_Trim_R1$sgmRNA_fraction <- CellRanger_A549_Trim_R1$Counts / CellRanger_A549_Trim_R1$Total
+
+### Add scCoVseq to Sample
+CellRanger_A549_Trim_R1$Sample <- "M58R_ExtR1_CellRanger"
+
+### Identify ORFs shared between periscope and scCoVseq
+shared_orfs <- intersect(CellRanger_A549_Trim_R1$Gene,
+                         periscope_counts$orf)
+
+### Subset dataframes to shared ORFs
+CellRanger_A549_Trim_R1 <- subset(CellRanger_A549_Trim_R1, Gene %in% shared_orfs)
+```
+
+## Merge scCoVseq pseudobulk and periscope counts dataframes
+```{r}
+periscope_counts <- subset(periscope_counts, orf %in% shared_orfs)
+
+### Select shared columns
+A549_Pseudobulk <- dplyr::select(
+  A549_Pseudobulk, Sample, Gene, sgmRNA_fraction, Counts)
+periscope_counts <- dplyr::select(
+  periscope_counts, sample, orf, sgmRNA_fraction, sgRNA_count)
+
+### Rename shared columns
+colnames(periscope_counts) <- colnames(A549_Pseudobulk)
+
+### Prepare replicate & condition columns
+periscope_counts <- periscope_counts %>% separate(col = Sample,
+                                into = c("Condition", "Replicate", NA),
+                                remove = FALSE)
+
+periscope_counts <- periscope_counts %>% group_by(Condition, Gene) %>%
+  mutate(Mean_sgmRNA_fraction = mean(sgmRNA_fraction),
+         Sd_sgmRNA_fraction = sd(sgmRNA_fraction),
+         Mean_sgmRNA_count = mean(Counts),
+         Sd_sgmRNA_count = sd(Counts)) %>%
+  dplyr::select(-Replicate, -Sample, -sgmRNA_fraction, -Counts) %>%
+  distinct()
+
+### Merge dataframes
+pseudobulk_vs_bulk <- left_join(
+  x = periscope_counts,
+  y = A549_Pseudobulk,
+  by = "Gene",
+  suffix = c("_Bulk_RNAseq",
+             "_scCoVseq")) %>%
+  ungroup() %>%
+  dplyr::select(Gene,
+                Mean_sgmRNA_fraction,
+                Sd_sgmRNA_fraction,
+                sgmRNA_fraction,
+                Mean_sgmRNA_count,
+                Sd_sgmRNA_count,
+                Counts)
+```
+
+## Merge scCoVseq Trim R1 pseudobulk and periscope counts dataframes
+```{r}
+### Select shared columns
+scCoVseq_A549_Trim_R1 <- dplyr::select(
+  scCoVseq_A549_Trim_R1, Sample, Gene, sgmRNA_fraction, Counts)
+
+### Merge dataframes
+pseudobulk_vs_bulk_scCoVseq_trim_R1 <- left_join(
+  x = periscope_counts,
+  y = scCoVseq_A549_Trim_R1,
+  by = "Gene",
+  suffix = c("_Bulk_RNAseq",
+             "_scCoVseq")) %>%
+  ungroup() %>%
+  dplyr::select(Gene,
+                Mean_sgmRNA_fraction,
+                Sd_sgmRNA_fraction,
+                sgmRNA_fraction,
+                Mean_sgmRNA_count,
+                Sd_sgmRNA_count,
+                Counts)
+```
+
+## Merge CellRanger Ext R1 pseudobulk and periscope counts dataframes
+
+```{r}
+### Select shared columns
+CellRanger_A549_Ext_R1 <- dplyr::select(
+  CellRanger_A549_Ext_R1, Sample, Gene, sgmRNA_fraction, Counts)
+
+### Merge dataframes
+pseudobulk_vs_bulk_cellranger_ext_R1 <- left_join(
+  x = periscope_counts,
+  y = CellRanger_A549_Ext_R1,
+  by = "Gene",
+  suffix = c("_Bulk_RNAseq",
+             "_scCoVseq")) %>%
+  ungroup() %>%
+ dplyr::select(Gene,
+                Mean_sgmRNA_fraction,
+                Sd_sgmRNA_fraction,
+                sgmRNA_fraction,
+                Mean_sgmRNA_count,
+                Sd_sgmRNA_count,
+                Counts)
+```
+
+## Merge CellRanger Trim R1 pseudobulk and periscope counts dataframes
+```{r}
+### Select shared columns
+CellRanger_A549_Trim_R1 <- dplyr::select(
+  CellRanger_A549_Trim_R1, Sample, Gene, sgmRNA_fraction, Counts)
+
+### Merge dataframes
+pseudobulk_vs_bulk_cellranger_trim_R1 <- left_join(
+  x = periscope_counts,
+  y = CellRanger_A549_Trim_R1,
+  by = "Gene",
+  suffix = c("_Bulk_RNAseq",
+             "_scCoVseq")) %>%
+  ungroup() %>%
+  dplyr::select(Gene,
+              Mean_sgmRNA_fraction,
+              Sd_sgmRNA_fraction,
+              sgmRNA_fraction,
+              Mean_sgmRNA_count,
+              Sd_sgmRNA_count,
+              Counts)
+```
+
+## Plot
+```{r}
+scCoVseq_extR1 <- ggplot(data = pseudobulk_vs_bulk,
+       aes(x = Mean_sgmRNA_fraction,
+           y = sgmRNA_fraction,
+           label = Gene)) +
+  geom_smooth(method = "lm",
+              se = FALSE,
+              color = "black",
+              linetype = "dashed",
+              size = 0.5) +
+  geom_point(aes(color = Gene),
+             size = 2) +
+  geom_errorbarh(mapping = aes(xmin = Mean_sgmRNA_fraction - Sd_sgmRNA_fraction,
+                              xmax = Mean_sgmRNA_fraction + Sd_sgmRNA_fraction),
+                 height = 0.2) +
+  theme_classic() +
+  labs(x = element_blank(),
+       y = "scCoVseq\nFraction of Viral Counts per sgmRNA",
+       title = "10X 5' Extended R1") +
+  scale_color_manual(values = Gene_Palette[names(Gene_Palette) %in% pseudobulk_vs_bulk$Gene]) +
+  scale_y_log10(label = scales::scientific,
+                breaks = 10^(-5:0)) +
+  scale_x_log10(label = scales::scientific,
+                breaks = 10^(-5:0)) +
+  coord_fixed(xlim = c(10^-5, 1),
+              ylim = c(10^-5, 1)) +
+  stat_cor(
+    method = "pearson",
+    cor.coef.name = "R",
+    label.sep = ",",
+    alternative = "greater",
+    r.accuracy = 0.01,
+    p.accuracy = 0.001) +
+  publication_theme +
+  theme(aspect.ratio = 1,
+        axis.text.x = element_text(angle = 45, hjust = 1))
+scCoVseq_trimR1 <- ggplot(data = pseudobulk_vs_bulk_scCoVseq_trim_R1,
+       aes(x = Mean_sgmRNA_fraction,
+           y = sgmRNA_fraction,
+           label = Gene)) +
+  geom_smooth(method = "lm",
+              se = FALSE,
+              color = "black",
+              linetype = "dashed",
+              size = 0.5) +
+  geom_point(aes(color = Gene),
+             size = 2) +
+  geom_errorbarh(mapping = aes(xmin = Mean_sgmRNA_fraction - Sd_sgmRNA_fraction,
+                               xmax = Mean_sgmRNA_fraction + Sd_sgmRNA_fraction),
+                 height = 0.2) +
+  theme_classic() +
+  labs(x = element_blank(),
+       y = element_blank(),
+       title = "10X 5'") +
+  scale_color_manual(values = Gene_Palette[names(Gene_Palette) %in% pseudobulk_vs_bulk$Gene]) +
+  scale_y_log10(label = scales::scientific,
+                breaks = 10^(-5:0)) +
+  scale_x_log10(label = scales::scientific,
+                breaks = 10^(-5:0)) +
+  coord_fixed(xlim = c(10^-5, 1),
+              ylim = c(10^-5, 1)) +
+  stat_cor(
+    method = "pearson",
+    cor.coef.name = "R",
+    label.sep = ",",
+    alternative = "greater",
+    r.accuracy = 0.01,
+    p.accuracy = 0.001) +
+  publication_theme +
+  theme(aspect.ratio = 1,
+        axis.text.x = element_text(angle = 45, hjust = 1))
+CellRanger_ExtR1 <- ggplot(data = pseudobulk_vs_bulk_cellranger_ext_R1,
+       aes(x = Mean_sgmRNA_fraction,
+           y = sgmRNA_fraction,
+           label = Gene)) +
+  geom_smooth(method = "lm",
+              se = FALSE,
+              color = "black",
+              linetype = "dashed",
+              size = 0.5) +
+  geom_point(aes(color = Gene),
+             size = 2) +
+  geom_errorbarh(mapping = aes(xmin = Mean_sgmRNA_fraction - Sd_sgmRNA_fraction,
+                               xmax = Mean_sgmRNA_fraction + Sd_sgmRNA_fraction),
+                 height = 0.2) +
+  theme_classic() +
+  labs(x = "Bulk RNAseq\nFraction of Viral Reads per sgmRNA\n(mean, n=3)",
+       y = "CellRanger\nFraction of Viral Counts per sgmRNA",
+       title = element_blank()) +
+  scale_color_manual(values = Gene_Palette[names(Gene_Palette) %in% pseudobulk_vs_bulk$Gene]) +
+  scale_y_log10(label = scales::scientific,
+                breaks = 10^(-5:0)) +
+  scale_x_log10(label = scales::scientific,
+                breaks = 10^(-5:0)) +
+  coord_fixed(xlim = c(10^-5, 1),
+              ylim = c(10^-5, 1)) +
+  stat_cor(
+    method = "pearson",
+    cor.coef.name = "R",
+    label.sep = ",",
+    alternative = "greater",
+    r.accuracy = 0.01,
+    p.accuracy = 0.001) +
+  publication_theme +
+  theme(aspect.ratio = 1,
+        axis.text.x = element_text(angle = 45, hjust = 1))
+CellRanger_TrimR1 <- ggplot(data = pseudobulk_vs_bulk_cellranger_trim_R1,
+       aes(x = Mean_sgmRNA_fraction,
+           y = sgmRNA_fraction,
+           label = Gene)) +
+  geom_smooth(method = "lm",
+              se = FALSE,
+              color = "black",
+              linetype = "dashed",
+              size = 0.5) +
+  geom_point(aes(color = Gene),
+             size = 2) +
+  geom_errorbarh(mapping = aes(xmin = Mean_sgmRNA_fraction - Sd_sgmRNA_fraction,
+                               xmax = Mean_sgmRNA_fraction + Sd_sgmRNA_fraction),
+                 height = 0.2) +
+  theme_classic() +
+  labs(x = "Bulk RNAseq\nFraction of Viral Reads per sgmRNA\n(mean, n=3)",
+       y = element_blank(),
+       title = element_blank()) +
+  scale_color_manual(values = Gene_Palette[names(Gene_Palette) %in% pseudobulk_vs_bulk$Gene]) +
+  scale_y_log10(label = scales::scientific,
+                breaks = 10^(-5:0)) +
+  scale_x_log10(label = scales::scientific,
+                breaks = 10^(-5:0)) +
+  coord_fixed(xlim = c(10^-5, 1),
+              ylim = c(10^-5, 1)) +
+  stat_cor(
+    method = "pearson",
+    cor.coef.name = "R",
+    label.sep = ",",
+    alternative = "greater",
+    r.accuracy = 0.01,
+    p.accuracy = 0.001) +
+  publication_theme +
+  theme(aspect.ratio = 1,
+        axis.text.x = element_text(angle = 45, hjust = 1))
+(scCoVseq_extR1 | scCoVseq_trimR1) /
+  (CellRanger_ExtR1 | CellRanger_TrimR1) + 
+  plot_layout(guides = "collect") +
+  plot_annotation(tag_levels = "A")
+ggplot2::ggsave(filename = here("analysis/figures/Vectorized/Figure_3/A_D_Bulk_Correlation_Relative_Abundance.pdf"))
+```
+
+# Plot viral gene correlation among A549s
+```{r}
+## Pull viral gene expression data
+Viral_Gene_Expression_A549 <- FetchData(
+  A549,
+  vars = c(as.character(viral_genes),
+           "nCount_Viral",
+           "Infection_Classification_K_Medoid_2"),
+  slot = "scale.data")
+
+### Arrange cells in order of increasing total viral UMIs
+Viral_Gene_Expression_A549 <- Viral_Gene_Expression_A549 %>% arrange(nCount_Viral)
+
+### Transpose matrix so viral genes are rows
+Viral_Gene_Expression_Mat <- t(Viral_Gene_Expression_A549[, as.character(viral_genes)])
+
+### Max out values to improve color scale
+Viral_Gene_Expression_Mat_Squish <- scales::oob_squish_any(Viral_Gene_Expression_Mat,
+                                                    range = c(min(Viral_Gene_Expression_Mat),
+                                                              as.numeric(quantile(Viral_Gene_Expression_Mat, 0.95))))
+
+### Make heatmap of viral gene expression per cell
+pdf(file = here("analysis/figures/Vectorized/Supplemental_Figure_2/A_A549_viral_UMIs.pdf"),
+    width = 4.25, height = 2.25)
+pheatmap(Viral_Gene_Expression_Mat_Squish,
+         scale = "none",
+         border_color = NA,
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         show_colnames = FALSE,
+         annotation_col = data.frame(Total_SARSCoV2_UMIs =
+                                       scales::oob_squish_any(
+                                         Viral_Gene_Expression_A549[, "nCount_Viral"],
+                                         range = c(min(Viral_Gene_Expression_A549[, "nCount_Viral"]),
+                                                   as.numeric(quantile(Viral_Gene_Expression_A549[, "nCount_Viral"], 0.95)))),
+                                     Infection_Status = 
+                                       Viral_Gene_Expression_A549[, "Infection_Classification_K_Medoid_2"],
+                                     row.names = rownames(Viral_Gene_Expression_A549)),
+         legend = TRUE,
+         annotation_legend = TRUE,
+         color = as.character(paletteer_c(`"viridis::magma"`,
+                                                       n = 1000)),
+         annotation_colors = list(
+           Total_SARSCoV2_UMIs = as.character(paletteer_c(`"viridis::viridis"`,
+                                                          n = 1000)),
+           Infection_Status = Infection_Classification_Palette[c("Infected",
+                                                                 "Uninfected")]),
+         fontsize = 6)
+dev.off()
+
+### Save plot without legend
+pdf(file = here("analysis/figures/Vectorized/Supplemental_Figure_2/A_A549_viral_UMIs_No_Legend.pdf"),
+    width = 4.25, height = 2.25)
+pheatmap(Viral_Gene_Expression_Mat_Squish,
+         scale = "none",
+         border_color = NA,
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         show_colnames = FALSE,
+         annotation_col = data.frame(Total_SARSCoV2_UMIs =
+                                       scales::oob_squish_any(
+                                         Viral_Gene_Expression_A549[, "nCount_Viral"],
+                                         range = c(min(Viral_Gene_Expression_A549[, "nCount_Viral"]),
+                                                   as.numeric(quantile(Viral_Gene_Expression_A549[, "nCount_Viral"], 0.95)))),
+                                     Infection_Status = 
+                                       Viral_Gene_Expression_A549[, "Infection_Classification_K_Medoid_2"],
+                                     row.names = rownames(Viral_Gene_Expression_A549)),
+         legend = FALSE,
+         annotation_legend = FALSE,
+         color = as.character(paletteer_c(`"viridis::magma"`,
+                                                       n = 1000)),
+         annotation_colors = list(
+           Total_SARSCoV2_UMIs = as.character(paletteer_c(`"viridis::viridis"`,
+                                                          n = 1000)),
+           Infection_Status = Infection_Classification_Palette[c("Infected",
+                                                                 "Uninfected")]),
+         fontsize = 6)
+dev.off()
+
+### Fetch normalized data this time
+Viral_Gene_Expression_A549 <- FetchData(A549,
+                                   vars = c(as.character(viral_genes)),
+                                   slot = "data")
+
+### Calculate pearson correlation between viral gene expression across cells
+Viral_Gene_Expression_A549 <- cor(Viral_Gene_Expression_A549,
+                             method = "pearson")
+
+### Calculate average expression of each viral gene in each dataset
+Viral_Gene_Counts <- AverageExpression(A549,
+                            features = as.character(viral_genes),
+                            slot = "data",
+                            return.seurat = FALSE)
+
+### Convert output to vector
+Viral_Gene_Counts <- Viral_Gene_Counts$RNA[,1]
+
+### Plot heatmap of gene expression correlation
+pdf(file = here("analysis/figures/Vectorized/Supplemental_Figure_3/C_viral_gene_correlation.pdf"),
+    width = 5, height = 4)
+Heatmap(Viral_Gene_Expression_A549,
+                  col = Color_Fun,
+                  name = "Pearson's\nR",
+        left_annotation = rowAnnotation(
+                   Average_Expression = Viral_Gene_Counts,
+                   col = list(Average_Expression = Counts_Color_Fun),
+                   show_annotation_name = TRUE,
+                   annotation_name_rot = 45,
+                   annotation_name_gp = gpar(fontsize = 6)),
+        row_names_side = "left",
+         cluster_columns = FALSE,
+         column_names_rot = 45,
+         column_names_gp = gpar(fontsize = 6),
+         cluster_rows = FALSE,
+         row_names_gp = gpar(fontsize = 6),
+         heatmap_legend_param = list(title_gp = gpar(fontsize = 8,
+                                                     fontface = "bold"),
+                                     labels_gp = gpar(fontsize = 6)),
+        height = unit(3, "in"),
+        width = unit(3, "in"),
+               rect_gp = gpar(type = "none"),
+         cell_fun = function(j, i, x, y, w, h, fill) {
+           if(i >= j) {
+             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+             }
+           })
+dev.off()
+```
+
+# Plot viral gene expression across a range of total viral UMIs
+
+```{r}
+### Calculate host nUMIs
+A549 <- calculate_host_nUMIs(A549)
+
+### Fetch counts of each viral gene, total host UMIs per cell, total viral UMIs per cell, and sequencing strategy metadata for infected cells only
+Viral_Gene_Expression <- FetchData(
+  A549,
+  vars = c(as.character(viral_genes), "nCount_Viral",
+           "Sequencing_Strategy", "host_nUMI"),
+  slot = "counts",
+  cells = WhichCells(
+    A549,
+    expression = Infection_Classification_K_Medoid_2 == "Infected")
+  )
+
+### Add column for cell barcode
+Viral_Gene_Expression$Cell_Barcode <- rownames(Viral_Gene_Expression)
+
+### Pivot data so all viral genes per cell are one column and arrange by total viral UMIs
+Viral_Gene_Expression <- Viral_Gene_Expression %>% 
+  pivot_longer(cols = as.character(viral_genes),
+               names_to = "Gene",
+               values_to = "Counts") %>%
+  arrange(nCount_Viral)
+
+### Make cell barcode column an ordered factor using the order by total viral UMIs  
+Viral_Gene_Expression$Cell_Barcode <- ordered(
+  Viral_Gene_Expression$Cell_Barcode,
+  levels = unique(Viral_Gene_Expression$Cell_Barcode))
+
+### Make viral gene a factor with levels ordered by position in viral genome
+Viral_Gene_Expression$Gene <- factor(Viral_Gene_Expression$Gene,
+                                     levels = viral_genes)
+
+### Plot viral gene expression per cell as a stacked bar plot
+Viral_GEX_Plots_Stacked <- ggplot(Viral_Gene_Expression,
+       aes(x = Cell_Barcode,
+           y = 1+Counts,
+           fill = Gene,
+           color = Gene)) +
+  geom_col(position = "stack") +
+  scale_color_manual(values = Gene_Palette) +
+  scale_fill_manual(values = Gene_Palette) +
+  scale_y_log10(breaks = 10^seq(from = 4, to = 16, by = 4)) +
+  labs(x = element_blank(),
+       y = "Viral UMIs per Cell") +
+  scale_x_discrete(expand = expansion(mult = c(0.01, 0.01))) +
+  publication_theme +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        strip.background = element_blank()) 
+
+### Plot viral gene expression per cell as a stacked bar plot scaled to 100% of viral gene expression
+Viral_GEX_Plots_Fill <- ggplot(Viral_Gene_Expression,
+       aes(x = Cell_Barcode,
+           y = Counts,
+           fill = Gene,
+           color = Gene)) +
+  geom_col(position = "fill") +
+  scale_color_manual(values = Gene_Palette) +
+  scale_fill_manual(values = Gene_Palette) +
+  labs(x = element_blank(),
+       y = "Fraction of Viral UMIs\nper Total Viral UMIs") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05)),
+                     labels = scales::percent) +
+  scale_x_discrete(expand = expansion(mult = c(0.01, 0.01))) +
+  publication_theme +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        strip.background = element_blank()) 
+
+### Plot total host UMIs per cell 
+Host_UMIs_plot <- ggplot(Viral_Gene_Expression,
+       aes(x = factor(Cell_Barcode),
+           y = host_nUMI)) +
+  geom_col(color = "grey75",
+           fill = "grey75") +
+  labs(x = "Cell",
+       y = "Total Host UMIs") +
+  scale_y_continuous(expand = expansion(mult = c(0.01, 0.05)),
+                     labels = scales::comma) +
+  scale_x_discrete(expand = expansion(mult = c(0.01, 0.01))) +
+  publication_theme +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_blank()) 
+
+### Arrange plots and save
+(Viral_GEX_Plots_Stacked / Viral_GEX_Plots_Fill / Host_UMIs_plot) +
+  plot_layout(heights = c(2, 2, 1),
+              guides = "collect")
+ggsave(filename = here("analysis/figures/Vectorized/Supplemental_Figure_3/B_Distribution_of_Viral_UMIs_A549.pdf"),
+       width = 5, height = 6.5)
+```
+
+# Supplemental Figure 1: Plot Host Gene Expression by Sequencing Method
+
+## Prepare Vero Data
+
+```{r}
+### Normalize RNA Data
+All_Seurat <- lapply(All_Seurat,
+  NormalizeData,
+  assay = "RNA",
+  normalization.method = "LogNormalize",
+  verbose = FALSE
+)
+
+### Subset & select Infected sample aligned to Kim reference
+Data_To_Compare <- All_Seurat[(grep(
+  pattern = "Inf_Kim_Single_Chrom$", x = names(All_Seurat)))]
+
+### Calculate the fraction of total UMIs per sample derived from each gene
+Counts_per_Gene <- sapply(Data_To_Compare, function(x){
+  ### Calculate sum UMIs per gene across samples
+  output <- Matrix::rowSums(x@assays$RNA@counts)
+  
+  ### Divide the UMIs per gene in the sample by the total UMIs in the sample
+  output <- output / sum(output)
+  return(output)
+})
+
+### Scale count values by 10^6
+Counts_per_Gene <- Counts_per_Gene * 10^6
+
+### Convert to data frame
+Counts_per_Gene <- as.data.frame(Counts_per_Gene)
+
+### Add Gene column
+Counts_per_Gene$Gene <- rownames(Counts_per_Gene)
+
+### Add column for Gene Source
+Counts_per_Gene$Source <- ifelse(
+  Counts_per_Gene$Gene %in% as.character(viral_genes),
+  "SARS-CoV-2",
+  "C. sabaeus")
+
+## Order data by gene source
+Counts_per_Gene <- arrange(Counts_per_Gene,
+                           Source)
+
+### Reformat column names
+colnames(Counts_per_Gene) <- str_remove(
+  string = colnames(Counts_per_Gene),
+  pattern = "_Inf_Kim_Single_Chrom$"
+)
+```
+
+## Prepare A549 Data
+
+```{r}
+## Import trim R1 5' data
+Trim_R1 <- readRDS(file = here("analysis/data/raw_data/A549_SARSCoV2_scCoVseq/count_A549_M58R_trim_R1_Gene_Cell_Matrix.rds"))
+
+## Create seurat object for Trim R1 data
+Trim_R1 <- CreateSeuratObject(Trim_R1,
+                              project = "Trim_R1")
+
+## Subset to cells analyzed in Ext R1 data
+Trim_R1 <- subset(Trim_R1,
+                  cells = str_remove(
+                    string = WhichCells(A549,
+                               expression = orig.ident == "M58R"),
+                    pattern = "_1$"))
+
+## Remove ambiguous UMIs from Trim_R1 data
+Trim_R1 <- Remove_Ambiguous_UMIs(Trim_R1)
+
+## Create list of A549_Objects
+A549_Comparison <- list(
+  Trim_R1 = Trim_R1,
+  Ext_R1 = subset(A549, orig.ident == "M58R")
+)
+
+### Calculate the fraction of total UMIs per sample derived from each gene
+Counts_per_Gene_A549 <- lapply(A549_Comparison,
+                          function(x){
+  ### Calculate sum UMIs per gene across samples
+  output <- Matrix::rowSums(x@assays$RNA@counts)
+  
+  ### Divide the UMIs per gene in the sample by the total UMIs in the sample
+  output <- output / sum(output)
+  
+  ### Convert to dataframe
+  output <- data.frame(
+    Gene = names(output),
+    ### Scale count values by 10^6
+    Count = output * 10^6
+  )
+  return(output)
+})
+
+### Merge data frames
+Counts_per_Gene_A549_Merge <- full_join(
+  x = Counts_per_Gene_A549$Trim_R1,
+  y = Counts_per_Gene_A549$Ext_R1,
+  by = "Gene",
+  suffix = c("FiveP", "Ext_R1"))
+
+### Add column for Gene Source
+Counts_per_Gene_A549_Merge$Source <- ifelse(
+  Counts_per_Gene_A549_Merge$Gene %in% as.character(viral_genes),
+  "SARS-CoV-2",
+  "C. sabaeus")
+
+## Order data by gene source
+Counts_per_Gene_A549_Merge <- arrange(Counts_per_Gene_A549_Merge,
+                           Source)
+
+### Reformat column names
+colnames(Counts_per_Gene_A549_Merge) <- str_remove(
+  string = colnames(Counts_per_Gene_A549_Merge),
+  pattern = "^Count"
+)
+```
+
+## Plot average gene expression per gene across methods
+```{r}
+plot_1 <- ggplot(Counts_per_Gene, aes(x = ThreeP, y = FiveP, color = Source)) +
+  geom_point(alpha = 0.5,
+             position = "jitter") +
+  geom_text_repel(data = subset(Counts_per_Gene, Source == "SARS-CoV-2"),
+                  mapping = aes(label = Gene),
+                  show.legend = FALSE) +
+  labs(x = "10X 3'", y = "10X 5'") +
+  coord_equal(xlim = c(10^-2, 10^6),
+              ylim = c(10^-2, 10^6)) +
+  scale_color_manual(values = c("darkgoldenrod2", "darkorchid2"),
+                     labels = c(expression(italic("C. sabaeus"), "SARS-CoV-2"))) +
+  scale_x_continuous(trans = scales::trans_new(name = "log10_pseudocount",
+                                       transform = function(x){log10(1 + x)},
+                                       inverse = function(x){(10^x) - 1},
+                                       breaks = function(x){log10(x)},
+                                       domain = c(0, Inf)),
+                     labels = scales::scientific,
+                     breaks = 10^c(0:7)) +
+  scale_y_continuous(trans = scales::trans_new(name = "log10_pseudocount",
+                                       transform = function(x){log10(1 + x)},
+                                       inverse = function(x){(10^x) - 1},
+                                       breaks = function(x){log10(x)},
+                                       domain = c(0, Inf)),
+                     labels = scales::scientific,
+                     breaks = 10^c(0:7)) +
+  publication_theme +
+  theme(legend.text.align = 0) +
+  stat_cor(
+    method = "pearson",
+    cor.coef.name = "R",
+    label.sep = ",",
+    alternative = "greater",
+    r.accuracy = 0.01,
+    p.accuracy = 0.001,
+    show.legend = FALSE
+  )
+
+plot_2 <- ggplot(Counts_per_Gene,
+                 aes(x = ThreeP, y = Ext_R1, color = Source)) +
+  geom_point(alpha = 0.5,
+             position = "jitter") +
+  geom_text_repel(data = subset(Counts_per_Gene, Source == "SARS-CoV-2"),
+                  mapping = aes(label = Gene),
+                  show.legend = FALSE) +
+  labs(x = "10X 3'", y = "10X 5'\nExtended R1") +
+    coord_equal(xlim = c(10^-2, 10^6),
+                ylim = c(10^-2, 10^6)) +
+  scale_color_manual(values = c("darkgoldenrod2", "darkorchid2"),
+                     labels = c(expression(italic("C. sabaeus"), "SARS-CoV-2"))) +
+  scale_x_continuous(trans = scales::trans_new(name = "log10_pseudocount",
+                                       transform = function(x){log10(1 + x)},
+                                       inverse = function(x){(10^x) - 1},
+                                       breaks = function(x){log10(x)},
+                                       domain = c(0, Inf)),
+                     labels = scales::scientific,
+                     breaks = 10^c(0:7)) +
+  scale_y_continuous(trans = scales::trans_new(name = "log10_pseudocount",
+                                       transform = function(x){log10(1 + x)},
+                                       inverse = function(x){(10^x) - 1},
+                                       breaks = function(x){log10(x)},
+                                       domain = c(0, Inf)),
+                     labels = scales::scientific,
+                     breaks = 10^c(0:7)) +
+  publication_theme +
+  theme(legend.text.align = 0) +
+  stat_cor(
+    method = "pearson",
+    cor.coef.name = "R",
+    label.sep = ",",
+    alternative = "greater",
+    r.accuracy = 0.01,
+    p.accuracy = 0.001,
+    show.legend = FALSE
+  )
+
+plot_3 <- ggplot(Counts_per_Gene, aes(x = FiveP, y = Ext_R1, 
+                                               color = Source)) +
+  geom_point(alpha = 0.5,
+             position = "jitter") +
+  geom_text_repel(data = subset(Counts_per_Gene, Source == "SARS-CoV-2"),
+                  mapping = aes(label = Gene),
+                  show.legend = FALSE) +
+  labs(x = "10X 5'", y = "10X 5'\nExtended R1") +
+    coord_equal(xlim = c(10^-2, 10^6),
+                ylim = c(10^-2, 10^6)) +
+  scale_color_manual(values = c("darkgoldenrod2", "darkorchid2"),
+                     labels = c(expression(italic("C. sabaeus"), "SARS-CoV-2"))) +
+  scale_x_continuous(trans = scales::trans_new(name = "log10_pseudocount",
+                                       transform = function(x){log10(1 + x)},
+                                       inverse = function(x){(10^x) - 1},
+                                       breaks = function(x){log10(x)},
+                                       domain = c(0, Inf)),
+                     labels = scales::scientific,
+                     breaks = 10^c(0:7)) +
+  scale_y_continuous(trans = scales::trans_new(name = "log10_pseudocount",
+                                       transform = function(x){log10(1 + x)},
+                                       inverse = function(x){(10^x) - 1},
+                                       breaks = function(x){log10(x)},
+                                       domain = c(0, Inf)),
+                     labels = scales::scientific,
+                     breaks = 10^c(0:7)) +
+  publication_theme +
+  theme(legend.text.align = 0) +
+  stat_cor(
+    method = "pearson",
+    cor.coef.name = "R",
+    label.sep = ",",
+    alternative = "greater",
+    r.accuracy = 0.01,
+    p.accuracy = 0.001,
+    show.legend = FALSE
+  )
+
+plot_4 <- ggplot(Counts_per_Gene_A549_Merge, 
+       aes(x = FiveP,
+           y = Ext_R1,
+           color = Source)) +
+  geom_point(alpha = 0.5,
+             position = "jitter") +
+  geom_text_repel(data = subset(Counts_per_Gene_A549_Merge, Source == "SARS-CoV-2"),
+                  mapping = aes(label = Gene),
+                  show.legend = FALSE) +
+  labs(x = "10X 5'",
+       y = "10X 5'\nExtended R1",
+       title = "A549") +
+  coord_equal(xlim = c(10^-2, 10^6),
+              ylim = c(10^-2, 10^6)) +
+  scale_color_manual(values = c("darkgoldenrod2", "darkorchid2"),
+                     labels = c(expression(italic("H. sapiens"), "SARS-CoV-2"))) +
+  scale_x_continuous(trans = scales::trans_new(name = "log10_pseudocount",
+                                       transform = function(x){log10(1 + x)},
+                                       inverse = function(x){(10^x) - 1},
+                                       breaks = function(x){log10(x)},
+                                       domain = c(0, Inf)),
+                     labels = scales::scientific,
+                     breaks = 10^c(0:7)) +
+  scale_y_continuous(trans = scales::trans_new(name = "log10_pseudocount",
+                                       transform = function(x){log10(1 + x)},
+                                       inverse = function(x){(10^x) - 1},
+                                       breaks = function(x){log10(x)},
+                                       domain = c(0, Inf)),
+                     labels = scales::scientific,
+                     breaks = 10^c(0:7)) +
+  publication_theme +
+  theme(legend.text.align = 0) +
+  stat_cor(
+    method = "pearson",
+    cor.coef.name = "R",
+    label.sep = ",",
+    alternative = "greater",
+    r.accuracy = 0.01,
+    p.accuracy = 0.001,
+    show.legend = FALSE
+  )
+
+(plot_1 | plot_2) / (plot_3 | plot_4) + 
+  plot_layout(guides = "collect") +
+  plot_annotation(tag_levels = "A")
+ggplot2::ggsave(
+  filename = paste0(vectorizedFiguresPath, "Supplemental_Figure_1/Host_Gene_Expression_By_Sequencing.pdf"),
+  device = "pdf", units = "in", width = 8, height = 10.5
+)
+```
+
+# Supplemental Figure 4: Heatmap of Junction Sites
+
+```{r}
+### Import STARsolo per cell "splice junction" x cell matrix
+Ext_R1_Junctions_per_Cell <- Matrix::readMM(
+  file = here("analysis/data/raw_data/Splice_Junctions/SJ/raw/matrix.mtx"))
+
+### Import "splice junction" annotations
+features <- read.delim(
+  file = here("analysis/data/raw_data/Splice_Junctions/SJ/raw/features.tsv"),
+  header = FALSE
+)
+
+### Format "splice junction" annotations
+features <- as.character(features[, 1])
+
+### Import cell barcodes
+cell_barcodes <- read.delim(
+  file = here("analysis/data/raw_data/Splice_Junctions/SJ/raw/barcodes.tsv"),
+  header = FALSE
+)
+
+### Format cell barcodes
+cell_barcodes <- as.character(cell_barcodes[, 1])
+cell_barcodes <- paste0("Inf_", cell_barcodes)
+
+### Add cell barcodes and splice junction annotations
+Ext_R1_Junctions_per_Cell@Dimnames[[1]] <- features
+Ext_R1_Junctions_per_Cell@Dimnames[[2]] <- cell_barcodes
+
+### Get cell barcodes for cells analyzed in scRNAseq data
+Ext_R1_Inf_Cells <- grep(
+  x = colnames(Optimized_Seurat$Ext_R1_Kim_scCoVseq),
+  pattern = "^Inf_",
+  value = TRUE
+)
+
+### Detect shared cells in scRNAseq and splice junction data
+Ext_R1_Inf_Cells <- intersect(
+  colnames(Ext_R1_Junctions_per_Cell),
+  Ext_R1_Inf_Cells
+)
+
+### Subset splice junction x cell matrix to cells in scRNAseq data
+Ext_R1_Junctions_per_Cell <- Ext_R1_Junctions_per_Cell[, Ext_R1_Inf_Cells]
+
+### Sum together UMIs per junction site across cells
+Pseudo_Bulk_Junctions <- Matrix::rowSums(Ext_R1_Junctions_per_Cell)
+
+### Make pseudo bulk junction data into a data frame
+Pseudo_Bulk_Junctions <- as.data.frame(Pseudo_Bulk_Junctions)
+
+### Rename columns
+colnames(Pseudo_Bulk_Junctions) <- "Total_UMIs"
+
+### Add splice junction site to data frame
+Pseudo_Bulk_Junctions$Junctions <- rownames(Pseudo_Bulk_Junctions)
+
+### Split junction annotation into start and end site and add to dataframe
+Pseudo_Bulk_Junctions <- cbind(
+  Pseudo_Bulk_Junctions, str_split(Pseudo_Bulk_Junctions$Junctions,
+  pattern = "_"
+  ) %>% 
+    unlist() %>% 
+    as.numeric() %>% 
+    matrix(ncol = 2, byrow = TRUE)
+  )
+
+### Name junction start and end sites in dataframe
+colnames(Pseudo_Bulk_Junctions)[3:4] <- c("Junction_Start", "Junction_End")
+
+### Log2 transform UMIs per junction site
+Pseudo_Bulk_Junctions$Log_UMIs <- log2(1 + Pseudo_Bulk_Junctions$Total_UMIs)
+
+### Arrange so junctions with lots of UMIs are on top of the figure
+Pseudo_Bulk_Junctions <- arrange(Pseudo_Bulk_Junctions, Total_UMIs)
+
+### Make a dataframe to draw a triangle block top of graph
+top_triangle <- data.frame(
+  x = c(-10000, -10000, 40000),
+  y = c(-10000, 40000, 40000)
+)
+
+### Plot junction sites like Kim et al figures
+### Clip values to first and 99th quantiles
+UMIs_per_Junction_Site_Plots <- ggplot() +
+  geom_point(
+    mapping =
+      aes(
+        x = Junction_End,
+        y = Junction_Start,
+        color = Log_UMIs
+      ),
+    size = 0.1,
+    shape = 15,
+    data = Pseudo_Bulk_Junctions
+  ) +
+  geom_polygon(
+    mapping = aes(x = x, y = y),
+    data = top_triangle,
+    fill = "white"
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 30000, by = 5000),
+    labels = c(0, "", 10, "", 20, "", 30),
+    position = "right"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 30000, by = 5000),
+    labels = c(0, "", 10, "", 20, "", 30)
+  ) +
+  publication_theme +
+  scale_color_gradientn(
+    colors = viridis::plasma(n = 1000),
+    name = "log2(UMIs/Junction)",
+    na.value = "transparent",
+    limits = c(
+      as.numeric(quantile(Pseudo_Bulk_Junctions$Log_UMIs, 0.01)),
+      as.numeric(quantile(Pseudo_Bulk_Junctions$Log_UMIs, 0.99))
+    )
+  ) +
+  coord_fixed(
+    xlim = c(-100, 30100),
+    ylim = c(-100, 30100),
+    expand = FALSE
+  ) +
+  labs(
+    x = "3' Junction Site (kB)",
+    y = "5' Junction Site (kB)",
+    title = "SARS-CoV-2 Junction Sites",
+    subtitle = "10X 5' Extended R1"
+  ) +
+  theme(
+    panel.background = element_rect(fill = viridis::plasma(1)),
+    legend.position = "left"
+  )
+UMIs_per_Junction_Site_Plots
+
+### Calculate the number of UMIs for junctions at a given start site
+UMIs_Per_Junction <- Pseudo_Bulk_Junctions %>%
+  group_by(Junction_Start) %>%
+  mutate(Start_UMIs = sum(Total_UMIs))
+
+### Calculate the number of UMIs for junctions at a given end site
+UMIs_Per_Junction <- UMIs_Per_Junction %>%
+  group_by(Junction_End) %>%
+  mutate(End_UMIs = sum(Total_UMIs))
+
+### Plot UMIs per Junction Start
+UMIs_per_Junction_Start_Plot <- ggplot(UMIs_Per_Junction, 
+                                       aes(x = Junction_Start, y = Start_UMIs)) +
+  geom_line(color = "firebrick") +
+  scale_x_continuous(position = "bottom") +
+  scale_y_continuous(position = "right") +
+  labs(
+    x = "5' Junction Site",
+    y = "UMIs"
+  ) +
+  publication_theme +
+  coord_flip(
+    xlim = c(-100, 30100),
+    expand = FALSE
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 270, hjust = 1),
+    axis.title.x = element_text(angle = 180),
+    axis.text.y = element_blank()
+  )
+
+### Plot UMIs per Junction End
+UMIs_per_Junction_End_Plot <- ggplot(UMIs_Per_Junction, 
+                                     aes(x = Junction_End, y = End_UMIs)) +
+  geom_line(color = "firebrick") +
+  labs(
+    x = "3' Junction Site",
+    y = "UMIs"
+  ) +
+  publication_theme +
+  scale_x_continuous(position = "top") +
+  scale_y_reverse() +
+  coord_cartesian(
+    xlim = c(100, 30100),
+    expand = FALSE
+  ) +
+  theme(axis.text.x = element_blank())
+
+### Prepare patchwork layout
+layout <- "
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+AAAAAAAAAAAAAAEBB
+DDDDDDDDDDDDDD###
+CCCCCCCCCCCCCC###
+CCCCCCCCCCCCCC###
+"
+
+### Format genome legend
+genome_legend_2 <- genome_legend +
+  theme(
+    axis.line = element_blank(),
+    axis.text = element_blank()
+  )
+
+### Organize plots with patchwork
+UMIs_per_Junction_Site_Plots +
+  UMIs_per_Junction_Start_Plot +
+  UMIs_per_Junction_End_Plot +
+  (genome_legend_2 + coord_cartesian(xlim = c(-100, 30100))) +
+  (genome_legend_2 + coord_flip(xlim = c(-100, 30100))) +
+  plot_layout(design = layout)
+
+### Save
+ggplot2::ggsave(
+  filename = paste0(vectorizedFiguresPath, "Supplemental_Figure_5/Pseudobulk_Junction_Site_Detection.pdf"),
+  width = 7, height = 7,
+  plot = last_plot()
+)
+```
+
+
+### Colophon
+
+This report was generated on `r Sys.time()` using the following computational environment and dependencies:
+
+```{r colophon, cache = FALSE}
+# which R packages and versions?
+if ("devtools" %in% installed.packages()) devtools::session_info()
+```
+
+The current Git commit details are:
+
+```{r}
+# what commit is this file at?
+if ("git2r" %in% installed.packages() & git2r::in_repository(path = ".")) git2r::repository(here::here())
+```
+

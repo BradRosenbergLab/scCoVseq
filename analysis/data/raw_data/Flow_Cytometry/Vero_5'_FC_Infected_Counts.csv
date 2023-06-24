@@ -1,0 +1,11 @@
+,Infection,Antigen,Permeabilization,n_NP+,n_Cells
+Mock_Unstained-No_Perm-2020-06-08-131653-1.fcs,Mock,Unstained,no perm,11,7534
+Mock_Isotype-No_Perm-2020-06-08-131750-2.fcs,Mock,Isotype_Ctrl,no perm,6,7345
+Mock_NP-No_Perm-2020-06-08-131845-3.fcs,Mock,NP,no perm,8,7599
+SARS2_Isotype-No_Perm-2020-06-08-131941-4.fcs,Inf,Isotype_Ctrl,no perm,5,5373
+SARS2_NP-No_Perm-2020-06-08-132042-5.fcs,Inf,NP,no perm,2877,5433
+Mock_Unstained-Perm-2020-06-08-132147-6.fcs,Mock,Unstained,perm,2,6786
+Mock_Isotype-Perm-2020-06-08-132332-7.fcs,Mock,Isotype_Ctrl,perm,23,6783
+Mock_NP-Perm-2020-06-08-132453-8.fcs,Mock,NP,perm,5,6885
+SARS2_Isotype-Perm-2020-06-08-132602-9.fcs,Inf,Isotype_Ctrl,perm,11,4805
+SARS2_NP-Perm-2020-06-08-132708-10.fcs,Inf,NP,perm,3585,4908

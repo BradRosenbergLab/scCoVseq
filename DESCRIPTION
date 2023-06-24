@@ -1,0 +1,67 @@
+Package: Sequencing.SARSCov2
+Title: scCoVseq_Analysis
+Version: 0.0.0.9000
+Authors@R:
+    c(person(given = "Phillip",
+           family = "Cohen",
+           role = "cre",
+           email = "phillip.cohen@icahn.mssm.edu"),
+    person(given = "Brad",
+           family = "Rosenberg",
+           role = "aut",
+           email = "brad.rosenberg@mssm.edu"))
+Maintainer: Brad Rosenberg <brad.rosenberg@mssm.edu>
+Description: Analyze modified 10X 5' scRNAseq to detect SARS-CoV2 sgRNAs
+License: MIT + file LICENSE
+ByteCompile: true
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Imports:
+  AnnotationDbi
+  base
+  Biobase
+  BiocGenerics
+  BiocManager
+  ComplexHeatmap
+  datasets
+  dplyr
+  edgeR
+  forcats
+  GenomeInfoDb
+  GenomicFeatures
+  GenomicRanges
+  ggbio
+  ggplot2
+  ggpubr
+  ggrepel
+  graphics
+  grDevices
+  grid
+  gridExtra
+  hdf5r
+  here
+  IRanges
+  limma
+  methods
+  mgsub
+  paletteer
+  parallel
+  patchwork
+  pheatmap
+  purrr
+  readr
+  renv
+  rrtools
+  S4Vectors
+  Seurat
+  SeuratObject
+  stats
+  stats4
+  stringr
+  styler
+  tibble
+  tidyr
+  tidyverse
+  utils

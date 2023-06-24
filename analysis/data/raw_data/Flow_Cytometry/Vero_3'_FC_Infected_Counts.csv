@@ -1,0 +1,9 @@
+Infection,Antigen,Permeabilization,n_Cells,n_NP+
+Mock,Unstained,no perm,,
+Mock,Isotype_Ctrl,no perm,,
+Mock,NP,no perm,6172,68
+Inf,NP,no perm,2795,1556
+Mock,Unstained,perm,,
+Mock,Isotype_Ctrl,perm,,
+Mock,NP,perm,5871,51
+Inf,NP,perm,4722,3682

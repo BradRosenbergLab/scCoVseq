@@ -1,0 +1,213 @@
+---
+title: "Prepare CellBarcode Whitelists from CellRanger Output"
+output:
+---
+
+##Prepare R environment
+
+###Load Packages and Custom Functions
+```{r echo = FALSE, message=FALSE}
+library(renv)
+library(rrtools)
+library(here)
+library(styler)
+library(hdf5r)
+library(Seurat)
+source(here("R/functions.R"))
+```
+
+###Store Paths to Input File
+```{r}
+####Path to all h5 files output from CellRanger containg Gene x Cell Matrices
+h5_dir <-  here("analysis/data/raw_data/CellRanger_Gene_x_Cell_Matrices_h5")
+
+h5_Files <- list.files(path = h5_dir, pattern = ".h5$", full.names = TRUE) %>% 
+  as.list()
+
+names(h5_Files) <- list.files(path = h5_dir, pattern = ".h5$", 
+                              full.names = FALSE) %>% 
+  gsub(pattern = ".h5$", replacement = "")  %>% 
+  gsub(pattern = "^3P", replacement = "ThreeP")
+```
+
+###Store Paths to Output Files
+```{r}
+####Path to Figures Output
+figuresPath <- here("analysis/figures")
+
+####Path to Vectorized Figure Outputs
+vectorizedFiguresPath <- here("analysis/figures/Vectorized/")
+
+####Path to Rasterized Figure Outputs
+rasterizedFiguresPath <- here("analysis/figures/Rasterized/")
+
+####Path to Data Objects Generated in this Analysis
+derivedDataPath <-  here("analysis/data/derived_data/")
+```
+
+###Prepare Color Palettes
+```{r}
+####Color Palette for Ambiguous/Unambiguous Regions of Transcriptome Reference
+ambiguous_palette <- wes_palettes$BottleRocket2[1:2]
+names(ambiguous_palette) <- c("Unambiguous", "Ambiguous")
+
+####Color Palette to Identify Sequencing Methods
+sequencing_palette <- c(pal_nejm("default")(8)[2:4])
+names(sequencing_palette) <- c("10X 3'", "10X 5'", "10X 5'\nExtended R1")
+
+####Color Palette for Viral ORFs
+Protein_Palette <- pal_d3(palette = "category20", alpha = 1)(11)
+names(Protein_Palette) <- viral_proteins
+
+Gene_Palette <- pal_d3(palette = "category20", alpha = 1)(11)
+names(Gene_Palette) <- viral_genes
+
+###Color Palette for Infection Sample
+Infection_Sample_Palette <- pal_startrek()(2)
+names(Infection_Sample_Palette) <- c("Infected", "Mock")
+```
+
+###Store Environment Objects
+This object will contain the minimal objects needed for downstream analysis
+```{r}
+objects_to_save <- ls()
+```
+
+
+```{r}
+NCBI_h5 <- h5_Files[grep(pattern = "NCBI_Single_Chrom", x = names(h5_Files))]
+
+###Select Gene Expression h5 files from the Vero Experiment
+NCBI_Data <- lapply(NCBI_h5, Read10X_h5)
+
+###Filter out any cells with less than 100 total UMIs
+Filtered_NCBI_Data <- lapply(NCBI_Data, function(x){
+  x[,Matrix::colSums(x) > 100]
+  })
+
+###Create Seurat Object
+NCBI_Cells <- lapply(Filtered_NCBI_Data, CreateSeuratObject)
+
+###Calculate Percentage Mitochondrial Gene Expression
+NCBI_Cells <- lapply(NCBI_Cells, PercentageFeatureSet, pattern = "^MT", 
+                     col.name = "percent_mito")
+```
+
+##Visualize QC Metrics for Objects Aligned to NCBI Reference
+We use the datasets that were aligned to the NCBI reference to identify cells and prepare a cell barcode whitelist
+```{r}
+###Visualize QC Metrics
+lapply(seq_along(NCBI_Cells), function(i){
+  x <- NCBI_Cells[[i]]
+  t <- names(NCBI_Cells)[[i]]
+  violins <- (VlnPlot(x, 
+                      features = c("nCount_RNA", "nFeature_RNA", "percent_mito"),
+                      pt.size = 0.01) / textGrob(label = t, hjust = "centre")) + 
+    plot_layout(heights = c(20, 1))
+  print(violins)
+  plot_1 <- FeatureScatter(x, 
+                           feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+  plot_2 <- FeatureScatter(x, 
+                           feature1 = "nCount_RNA", feature2 = "percent_mito")
+  plot <- ((plot_1 | plot_2) / textGrob(label = t, hjust = "centre")) + 
+    plot_layout(heights = c(20, 1))
+  print(plot)
+})
+```
+
+###Filter out Empty Droplets, Dead Cells, & Doublets 
+Using the plots above, we determine filtering parameters to identify likely cell-containing droplets. These barcodes can then be used to compare the same cells mapped to different references
+
+3' Infected
+percent_mito < 3
+10 < nFeature_RNA < 3000
+
+3' Mock
+nCount_RNA > 3000
+percent_mito < 2.25
+400 < nFeature_RNA < 4000
+
+5' Infected
+10 < nFeature_RNA < 7000
+nCount_RNA > 3000
+percent_mito < 0.75
+
+5' Mock
+nCount_RNA > 3000
+percent_mito < 0.75
+
+5' Ext R1 Infected
+200 < nCount_RNA < 45000
+10 < nFeature_RNA < 5500
+percent_mito < 1
+
+5' Ext R1 Mock
+percent_mito < 1
+nFeature_RNA < 6000
+nCount_RNA > 3000
+
+###Filter each object based on the parameters above
+```{r}
+NCBI_Cells$ThreeP_Inf_NCBI_Single_Chrom <-
+  subset(NCBI_Cells$ThreeP_Inf_NCBI_Single_Chrom, 
+         percent_mito < 3 & nFeature_RNA < 3000 & nFeature_RNA > 10)
+NCBI_Cells$ThreeP_Mock_NCBI_Single_Chrom <-
+  subset(NCBI_Cells$ThreeP_Mock_NCBI_Single_Chrom, 
+         percent_mito < 2.25 & nCount_RNA > 1000 & nFeature_RNA > 400 & nFeature_RNA < 4000)
+NCBI_Cells$Conventional_Inf_NCBI_Single_Chrom <-
+  subset(NCBI_Cells$Conventional_Inf_NCBI_Single_Chrom,
+         nFeature_RNA > 10 & nFeature_RNA < 7000 & percent_mito < 0.75 & nCount_RNA > 3000)
+NCBI_Cells$Conventional_Mock_NCBI_Single_Chrom <-
+  subset(NCBI_Cells$Conventional_Mock_NCBI_Single_Chrom,
+         nCount_RNA > 3000 & percent_mito < 0.75)
+NCBI_Cells$Modified_Inf_NCBI_Single_Chrom <-
+  subset(NCBI_Cells$Modified_Inf_NCBI_Single_Chrom,
+         nCount_RNA > 3000 & nCount_RNA < 45000 & nFeature_RNA < 5500 & nFeature_RNA > 10 & percent_mito < 1)
+NCBI_Cells$Modified_Mock_NCBI_Single_Chrom <-
+  subset(NCBI_Cells$Modified_Mock_NCBI_Single_Chrom,
+        percent_mito < 1 & nFeature_RNA < 6000 & nCount_RNA > 3000)
+```
+
+###Visualize QC Metrics Post-Filtering
+```{r}
+lapply(seq_along(NCBI_Cells), function(i){
+  x <- NCBI_Cells[[i]]
+  t <- names(NCBI_Cells)[[i]]
+  violins <- (VlnPlot(x, 
+                      features = c("nCount_RNA", "nFeature_RNA", "percent_mito"),
+                      pt.size = 0.01) / textGrob(label = t, hjust = "centre")) + 
+    plot_layout(heights = c(20, 1))
+  print(violins)
+  plot_1 <- FeatureScatter(x, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+  plot_2 <- FeatureScatter(x, feature1 = "nCount_RNA", feature2 = "percent_mito")
+  plot <- ((plot_1 | plot_2) / textGrob(label = t, hjust = "centre")) + 
+    plot_layout(heights = c(20, 1))
+  print(plot)
+})
+```
+
+###Print the number of cells per object post-filtering
+```{r}
+lapply(NCBI_Cells, ncol)
+```
+
+###Save Whitelist
+Write whitelist to tsv file for use downstream analyses
+```{r}
+cells <- list(
+  ThreeP_Mock_Cells = colnames(NCBI_Cells$ThreeP_Mock_NCBI_Single_Chrom), 
+  ThreeP_Inf_Cells = colnames(NCBI_Cells$ThreeP_Inf_NCBI_Single_Chrom),
+  Conventional_Mock_Cells = colnames(NCBI_Cells$Conventional_Mock_NCBI_Single_Chrom),
+  Conventional_Inf_Cells = colnames(NCBI_Cells$Conventional_Inf_NCBI_Single_Chrom),
+  Modified_Mock_Cells = colnames(NCBI_Cells$Modified_Mock_NCBI_Single_Chrom),
+  Modified_Inf_Cells = colnames(NCBI_Cells$Modified_Inf_NCBI_Single_Chrom))
+
+for (i in seq_along(cells)) {
+ name <- names(cells)[i]
+ object <- gsub(pattern = "-1", x = cells[[i]], replacement = "")
+ write_tsv(x = as.data.frame(object), 
+           file = paste0(derivedDataPath, name, ".txt"),
+           quote_escape = FALSE,
+           col_names = FALSE) 
+}
+```
